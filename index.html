@@ -11,6 +11,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Carnet Lineas">
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1189,7 +1194,7 @@
 
   <div class="home-grid">
 
-    <button class="home-tile" id="tileService">
+    <button class="home-tile" id="tileService" data-page="service">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Document -->
@@ -1213,7 +1218,7 @@
       <div class="home-tile-sub">Importer ma fiche PDF</div>
     </button>
 
-    <button class="home-tile" id="tileTrains">
+    <button class="home-tile" id="tileTrains" data-page="trains">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Corps loco -->
@@ -1241,7 +1246,7 @@
       <div class="home-tile-sub">Enregistrer un trajet</div>
     </button>
 
-    <button class="home-tile" id="tileE500">
+    <button class="home-tile" id="tileE500" data-page="e500">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Grille calendrier -->
@@ -1268,7 +1273,7 @@
       <div class="home-tile-sub">Planning série BCHA-BV</div>
     </button>
 
-    <button class="home-tile" id="tileResume">
+    <button class="home-tile" id="tileResume" data-page="resume">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="6" y="8" width="52" height="48" rx="6" fill="currentColor" opacity="0.1"/>
@@ -1459,12 +1464,10 @@ function showPage(name){
 }
 
 backBtn.addEventListener('click', () => showPage('home'));
-
-// Tuiles de la page d'accueil
-document.getElementById('tileService').addEventListener('click', () => showPage('service'));
-document.getElementById('tileTrains').addEventListener('click',  () => showPage('trains'));
-document.getElementById('tileE500').addEventListener('click',    () => showPage('e500'));
-document.getElementById('tileResume').addEventListener('click',  () => showPage('resume'));
+// Tuiles accueil
+document.querySelectorAll('[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
+});
 
 /* ==================== RÉSUMÉ ==================== */
 let resumeMode = 'mois';   // 'mois' | 'annee'
@@ -1900,26 +1903,27 @@ function buildE500StatsHTML(s){
   `;
 }
 
-<script>
-// Polyfill window.storage via localStorage (PWA installable)
+// Polyfill window.storage via localStorage (fichier local ou PWA)
 if(!window.storage){
   window.storage = {
-    async get(key){ try{ const v=localStorage.getItem(key); return v!==null?{key,value:v}:null; }catch(e){return null;} },
-    async set(key,value){ try{ localStorage.setItem(key,value); return {key,value}; }catch(e){return null;} },
-    async delete(key){ try{ localStorage.removeItem(key); return {key,deleted:true}; }catch(e){return null;} },
-    async list(prefix){ try{ const keys=Object.keys(localStorage).filter(k=>!prefix||k.startsWith(prefix)); return {keys,prefix}; }catch(e){return {keys:[]};} }
+    async get(key){
+      try{ const v = localStorage.getItem(key); return v !== null ? {key, value: v} : null; }catch(e){ return null; }
+    },
+    async set(key, value){
+      try{ localStorage.setItem(key, value); return {key, value}; }catch(e){ return null; }
+    },
+    async delete(key){
+      try{ localStorage.removeItem(key); return {key, deleted: true}; }catch(e){ return null; }
+    },
+    async list(prefix){
+      try{
+        const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+        return {keys, prefix};
+      }catch(e){ return {keys:[]}; }
+    }
   };
 }
-// Enregistrer le Service Worker
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js')
-      .catch(err => console.log('SW:', err));
-  });
-}
-</script>
 
-<script>
 let trips = [];
 let serviceData = null;
 let serviceHistory = {};
