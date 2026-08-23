@@ -1189,7 +1189,7 @@
 
   <div class="home-grid">
 
-    <button class="home-tile" id="tileService" onclick="showPage('service')">
+    <button class="home-tile" id="tileService">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Document -->
@@ -1213,7 +1213,7 @@
       <div class="home-tile-sub">Importer ma fiche PDF</div>
     </button>
 
-    <button class="home-tile" id="tileTrains" onclick="showPage('trains')">
+    <button class="home-tile" id="tileTrains">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Corps loco -->
@@ -1241,7 +1241,7 @@
       <div class="home-tile-sub">Enregistrer un trajet</div>
     </button>
 
-    <button class="home-tile" id="tileE500" onclick="showPage('e500')">
+    <button class="home-tile" id="tileE500">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Grille calendrier -->
@@ -1268,7 +1268,7 @@
       <div class="home-tile-sub">Planning série BCHA-BV</div>
     </button>
 
-    <button class="home-tile" id="tileResume" onclick="showPage('resume')">
+    <button class="home-tile" id="tileResume">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="6" y="8" width="52" height="48" rx="6" fill="currentColor" opacity="0.1"/>
@@ -1459,6 +1459,12 @@ function showPage(name){
 }
 
 backBtn.addEventListener('click', () => showPage('home'));
+
+// Tuiles de la page d'accueil
+document.getElementById('tileService').addEventListener('click', () => showPage('service'));
+document.getElementById('tileTrains').addEventListener('click',  () => showPage('trains'));
+document.getElementById('tileE500').addEventListener('click',    () => showPage('e500'));
+document.getElementById('tileResume').addEventListener('click',  () => showPage('resume'));
 
 /* ==================== RÉSUMÉ ==================== */
 let resumeMode = 'mois';   // 'mois' | 'annee'
