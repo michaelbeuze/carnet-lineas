@@ -1784,6 +1784,9 @@ function parseE500Planning(pages, driverName){
   };
   const moisNoms = ['','Janvier','Février','Mars','Avril','Mai','Juin',
                     'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const FOR_CODES = new Set(['RX','OO','LH','ELH','EL','LE','CP','CT','ABA','LST',
+                             'SAM','DIM','LUN','MAR','MER','JEU','VEN','VEDE','VEDE',
+                             'PAUZE','END','LEASE','CTB','TAXI','TRANSFER']);
 
   for(const page of pages){
     const text     = page.text || '';
@@ -1799,149 +1802,76 @@ function parseE500Planning(pages, driverName){
     const yearMatch = text.match(/\b(20\d{2})\b/);
     if(yearMatch) annee = parseInt(yearMatch[1]);
 
-    // ---- Colonnes jours depuis les items (positions x) ----
-    // Chercher la ligne avec au moins 20 chiffres distincts entre 1-31
-    const items = page.items || [];
-    const byY = {};
-    items.forEach(it => {
-      const v = parseInt(it.str);
-      if(!isNaN(v) && v >= 1 && v <= 31){
-        const yk = Math.round(it.y);
-        if(!byY[yk]) byY[yk] = [];
-        byY[yk].push({x: it.x, v});
-      }
-    });
+    // ---- APPROCHE TEXTE BRUT (robuste, sans positions x) ----
+    // 1. Extraire les jours depuis le header "Data 1 2 3 4 ..."
+    const dataMatch = text.match(/Data\s+((?:\d{1,2}\s+){10,})/i);
+    const headerDays = dataMatch
+      ? dataMatch[1].trim().split(/\s+/).map(Number).filter(n => n >= 1 && n <= 31)
+      : [];
 
-    let dayColsX = {}; // x -> numéro de jour
-    let bestCount = 0;
-    for(const [yk, pairs] of Object.entries(byY)){
-      const uniq = new Set(pairs.map(p => p.v));
-      if(uniq.size > bestCount){
-        bestCount = uniq.size;
-        dayColsX = {};
-        pairs.forEach(p => { dayColsX[p.x] = p.v; });
-      }
-    }
-
-    // ---- Ligne du conducteur : trouver les items qui matchent le nom ----
-    const matchItems = items.filter(it =>
-      nameParts.some(p => normalizeStr(it.str).includes(p))
+    // 2. Trouver la séquence de tokens de la ligne du conducteur
+    // Format: "BEUZE [stats] MICHAËL [tok1 tok2 ... tokN] -HHH:MM"
+    // On cherche entre le 2e nom et le premier grand négatif
+    const nameRe = new RegExp(
+      nameParts[0] + '[\\s\\S]{1,200}' + (nameParts[1] || nameParts[0]) + '\\s+([\\s\\S]+?)(?=-\\d{2,3}:\\d{2})',
+      'i'
     );
+    const nameMatch = pageNorm.match(nameRe);
+    const tokenSeq = nameMatch ? nameMatch[1].trim().split(/\s+/) : [];
 
-    let servicesByDay = {};
-    let heuresByDay = {}; // dateKey -> {debut, fin}
+    // 3. Associer token[i] -> jour headerDays[i]
+    const servicesByDay = {};
+    const heuresByDay   = {};
+    const pad = n => String(n).padStart(2,'0');
 
-    if(matchItems.length > 0 && bestCount >= 20){
-      console.log('[E500] bestCount='+bestCount+' matchY='+matchItems[0].y);
-      console.log('[E500] dayColsX sample:', JSON.stringify(Object.entries(dayColsX).slice(0,5)));
-      console.log('[E500] items near condY:', JSON.stringify(items.filter(it => Math.abs(it.y-matchItems[0].y)<10 && it.x < 650).slice(0,10)));
-      const condY = matchItems[0].y;
-      const colXs = Object.keys(dayColsX).map(Number);
-
-      // Extraire les services (numéros 800-999) ET les codes spéciaux (FOR, FORP)
-      const CODES_SPECIAUX = new Set(['FOR','FORP','FORT','FORTFOR']);
-      const extractServices = (tolY) => {
-        items.forEach(it => {
-          if(Math.abs(it.y - condY) > tolY) return;
-          const s = it.str.trim();
-          const v = parseInt(s);
-          const isService = !isNaN(v) && v >= 800 && v <= 999;
-          const isCode = CODES_SPECIAUX.has(s.toUpperCase());
-          if(!isService && !isCode) return;
-          const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
-          if(Math.abs(closest - it.x) < 15 && annee && mois){
-            const day = dayColsX[closest];
-            const pad = n => String(n).padStart(2,'0');
-            const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
-            if(isCode) servicesByDay[dateKey] = 'FOR';
-            else if(!servicesByDay[dateKey]) servicesByDay[dateKey] = String(v);
-          }
-        });
-      };
-      extractServices(8);
-      if(Object.keys(servicesByDay).length === 0) extractServices(30);
-
-      // Extraire les heures (zone sous la ligne service : condY - 8 à condY - 30)
-      // Les heures sont fragmentées en caractères, on regroupe par x proche
-      const hoursZone = items.filter(it =>
-        it.y > condY - 35 && it.y < condY - 2 && it.x < 650
-      );
-      // Regrouper par colonne (jour)
-      const byDayHours = {};
-      hoursZone.forEach(it => {
-        const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
-        if(Math.abs(closest - it.x) < 15){
-          const day = dayColsX[closest];
-          if(!byDayHours[day]) byDayHours[day] = [];
-          byDayHours[day].push(it);
-        }
-      });
-
-      // Pour chaque jour, reconstruire les tokens H:MM
-      const timeRe = /^\d{1,2}:\d{2}$/;
-      const cleanTime = t => {
-        // Nettoyer tokens parasites: "16:001" -> "16:00", "11:451" -> "11:45"
-        const m = t.match(/^(\d{1,2}:\d{2})\d*$/);
-        return m ? m[1] : null;
-      };
-
-      for(const [day, dayItems] of Object.entries(byDayHours)){
-        const pad = n => String(n).padStart(2,'0');
-        if(!annee || !mois) continue;
+    if(headerDays.length > 0 && tokenSeq.length >= headerDays.length){
+      // Prendre uniquement les N premiers tokens (N = nombre de jours)
+      const mainTokens = tokenSeq.slice(0, headerDays.length);
+      mainTokens.forEach((tok, i) => {
+        const day = headerDays[i];
+        if(!annee || !mois || !day) return;
         const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
-        // Inclure les heures pour TOUS les jours (services ET formation)
-        if(!servicesByDay[dateKey]) continue; // pas de service ni formation ce jour
+        const v = parseInt(tok);
+        const isService = !isNaN(v) && v >= 800 && v <= 999;
+        const isFor = /^(FOR|FORP|FORTFOR)$/i.test(tok);
+        if(isService) servicesByDay[dateKey] = String(v);
+        else if(isFor) servicesByDay[dateKey] = 'FOR';
+      });
+    }
 
-        // Trier par y décroissant puis x croissant
-        dayItems.sort((a,b) => b.y - a.y || a.x - b.x);
-
-        // Grouper en tokens (gap x > 8 ou gap y > 2 = nouveau token)
-        const tokens = [];
-        let cur = [];
-        for(const it of dayItems){
-          if(cur.length > 0){
-            const last = cur[cur.length-1];
-            if(it.x - last.x > 8 || Math.abs(it.y - last.y) > 2){
-              tokens.push(cur.map(i => i.str).join(''));
-              cur = [];
-            }
-          }
-          cur.push(it);
+    // 4. Extraire les heures depuis le texte (zone après les tokens)
+    // Les heures apparaissent fragmentées — on cherche les patterns H:MM dans la section
+    // après la séquence principale et avant "Initially planned"
+    // Elles sont associées aux mêmes jours dans le même ordre
+    if(headerDays.length > 0 && tokenSeq.length > headerDays.length){
+      const afterTokens = tokenSeq.slice(headerDays.length);
+      // Chercher les patterns H:MM ou HH:MM dans les tokens restants
+      // et reconstruire les paires début/fin
+      const allTimes = [];
+      let buf = '';
+      for(const tok of afterTokens){
+        buf += tok;
+        const m = buf.match(/^(\d{1,2}:\d{2})/);
+        if(m){
+          allTimes.push(m[1]);
+          buf = buf.slice(m[1].length);
+        }else if(buf.length > 6){
+          buf = tok; // reset si trop long
         }
-        if(cur.length) tokens.push(cur.map(i => i.str).join(''));
+      }
 
-        // Filtrer les tokens qui ressemblent à H:MM
-        const times = tokens.map(cleanTime).filter(Boolean);
-        if(times.length >= 2){
-          heuresByDay[dateKey] = { debut: times[0], fin: times[1] };
-        }else if(times.length === 1){
-          heuresByDay[dateKey] = { debut: times[0], fin: null };
+      // Associer les heures aux jours qui ont un service
+      const serviceDays = Object.keys(servicesByDay).sort();
+      let ti = 0;
+      for(const dateKey of serviceDays){
+        if(ti + 1 < allTimes.length){
+          heuresByDay[dateKey] = { debut: allTimes[ti], fin: allTimes[ti+1] };
+          ti += 2;
         }
       }
     }
 
-    // Fallback : si pas de positions, ordre séquentiel depuis le texte
-    if(Object.keys(servicesByDay).length === 0){
-      console.log('[E500 FALLBACK] bestCount='+bestCount+' matchItems='+matchItems.length);
-      const pos0 = pageNorm.indexOf(nameParts[0]);
-      const ip1 = pageNorm.indexOf('initially planned', pos0);
-      const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
-      const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
-      const section = pageNorm.slice(pos0, secEnd);
-      const prestNums = [...section.matchAll(/\b(\d{3,4})\b/g)]
-        .map(m => m[1]).filter(n => { const v = parseInt(n); return v >= 800 && v <= 999; });
-      const uniquePrests = [...new Set(prestNums)];
-      uniquePrests.forEach((p, i) => {
-        if(annee && mois){
-          const pad = n => String(n).padStart(2,'0');
-          servicesByDay[`${annee}-${pad(mois)}-${pad(i + 1)}`] = p;
-        }else{
-          servicesByDay[i + 1] = p;
-        }
-      });
-    }
-
-    // ---- Totaux heures ----
+    // 5. Totaux heures
     const pos0 = pageNorm.indexOf(nameParts[0]);
     const ip1 = pageNorm.indexOf('initially planned', pos0);
     const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
@@ -1958,7 +1888,7 @@ function parseE500Planning(pages, driverName){
     return {
       mois, annee,
       moisLabel: mois ? `${moisNoms[mois]} ${annee || ''}` : (annee ? String(annee) : ''),
-      nbServices: Object.keys(servicesByDay).length,
+      nbServices: Object.values(servicesByDay).filter(v => /^\d{3,}$/.test(v)).length,
       schedule: servicesByDay,
       heures: heuresByDay,
       urTh,
