@@ -1,0 +1,3462 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carnet de bord — Conducteur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0D0F;
+    --card:#16191C;
+    --card-hover:#1D2226;
+    --lime:#C6E000;
+    --lime-dark:#9FB400;
+    --text:#F1F3F1;
+    --muted:#8B9499;
+    --border:#272B2E;
+    --danger:#FF6B6B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding-bottom:90px;
+  }
+
+  /* ---------- HEADER ---------- */
+  header.topbar{
+    background:#000000;
+    color:var(--text);
+    padding:18px 20px 22px;
+    position:relative;
+  }
+  header.topbar::after{
+    content:'';
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:4px;
+    background:var(--lime);
+  }
+  .topbar-inner{
+    max-width:760px;
+    margin:0 auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .wordmark{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    font-family:'Sora',sans-serif;
+    font-weight:800;
+    font-size:19px;
+    letter-spacing:0.01em;
+    color:var(--text);
+  }
+  .wordmark .mark{
+    width:11px;height:11px;
+    background:var(--lime);
+    border-radius:2px;
+    flex-shrink:0;
+  }
+  .topbar .subtitle{
+    margin:4px 0 0 20px;
+    font-size:12.5px;
+    color:var(--muted);
+    font-weight:500;
+  }
+  .status-pill{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--lime);
+    background:rgba(198,224,0,0.08);
+    border:1px solid rgba(198,224,0,0.25);
+    border-radius:20px;
+    padding:6px 12px;
+  }
+  .status-pill .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--lime);
+    box-shadow:0 0 6px var(--lime);
+  }
+
+  /* ---------- MAIN ---------- */
+  main{
+    max-width:760px;
+    margin:0 auto;
+    padding:20px 16px;
+  }
+  .section-label{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    color:var(--text);
+    margin:24px 0 12px;
+    letter-spacing:0.01em;
+  }
+  .section-label:first-child{ margin-top:0; }
+
+  /* ---------- PROFILE ---------- */
+  .profile-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .profile-card label{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .profile-card input{
+    flex:1;
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:9px 12px;
+  }
+  .profile-card input:focus{
+    outline:2px solid var(--lime);
+    outline-offset:1px;
+    border-color:var(--lime);
+  }
+
+  /* ---------- SERVICE ---------- */
+  .service-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+  }
+  .service-top{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .service-top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .service-date-block{
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .service-date-big{
+    font-family:'Sora',sans-serif;
+    font-weight:800;
+    font-size:26px;
+    color:var(--text);
+    line-height:1;
+  }
+  .service-id{
+    font-family:'Sora',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--muted);
+    letter-spacing:0.03em;
+  }
+  .service-date{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .service-date-input{
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    padding:5px 6px;
+    margin-top:4px;
+    color-scheme:dark;
+  }
+  .service-date-input:focus{
+    outline:2px solid var(--lime);
+    outline-offset:1px;
+    border-color:var(--lime);
+  }
+  .service-stats{
+    display:flex;
+    gap:20px;
+  }
+  .service-stat .value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:20px;
+    color:var(--lime);
+    line-height:1.1;
+  }
+  .service-stat .label{
+    font-size:10.5px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-top:3px;
+  }
+  .time-inputs{
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .time-inputs span{
+    color:var(--muted);
+    font-size:12px;
+  }
+  input[type="time"]{
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--lime);
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    padding:5px 6px;
+    color-scheme:dark;
+  }
+  input[type="time"]:focus{
+    outline:2px solid var(--lime);
+    outline-offset:1px;
+    border-color:var(--lime);
+  }
+  .service-stat .time-inputs input[type="time"]{ font-size:15px; padding:6px 8px; }
+  .leg-actions{
+    display:flex;
+    gap:8px;
+  }
+  .leg-actions button{ flex:1; font-size:13px; padding:9px 10px; }
+  .btn-save-trip{
+    background:var(--lime);
+    color:#0B0D0F;
+    border:none;
+  }
+  .btn-save-trip:hover{ background:var(--lime-dark); }
+  .service-empty{
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.5;
+  }
+
+  /* ---------- LEG CARDS (trains du service) ---------- */
+  .leg-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .leg-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-left:4px solid var(--lime);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .leg-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+    cursor:pointer;
+  }
+  .leg-train{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    color:var(--lime);
+    font-size:13px;
+    letter-spacing:0.04em;
+  }
+  .leg-train .leg-chevron{
+    font-size:13px;
+    color:var(--muted);
+    transition:transform 0.2s ease;
+  }
+  .leg-card.open .leg-train .leg-chevron{ transform:rotate(90deg); color:var(--lime); }
+  .leg-extra{
+    display:none;
+    margin-bottom:12px;
+  }
+  .leg-card.open .leg-extra{ display:block; }
+  .leg-extra-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:8px;
+  }
+  .leg-extra-grid .field-mini label{
+    display:block;
+    font-size:10.5px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-bottom:4px;
+  }
+  .leg-hlp{
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px 12px;
+    font-size:13px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .leg-hlp input[type="checkbox"]{
+    width:18px; height:18px;
+    accent-color:var(--lime);
+    flex-shrink:0;
+  }
+  .leg-hlp .hlp-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    color:var(--lime);
+    letter-spacing:0.06em;
+  }
+  .hlp-config{
+    grid-column:1 / -1;
+    display:flex;
+    gap:8px;
+  }
+  .hlp-option{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:9px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:var(--bg);
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0.06em;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .hlp-option input{ position:absolute; opacity:0; pointer-events:none; }
+  .hlp-option.active{
+    border-color:var(--lime);
+    color:var(--lime);
+    background:rgba(198,224,0,0.08);
+  }
+  .leg-time{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--muted);
+    font-size:12.5px;
+  }
+  .leg-operateur{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .leg-fields{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:8px;
+    align-items:center;
+    margin-bottom:12px;
+  }
+  .leg-fields input, .leg-extra-grid input{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    padding:8px 10px;
+  }
+  .leg-fields input:focus, .leg-extra-grid input:focus{
+    outline:2px solid var(--lime);
+    outline-offset:1px;
+    border-color:var(--lime);
+  }
+  .leg-arrow{
+    color:var(--lime-dark);
+    font-size:14px;
+  }
+  .btn-camera{
+    width:100%;
+    background:transparent;
+    border:1px solid var(--lime);
+    color:var(--lime);
+  }
+  .btn-camera:hover{ background:rgba(198,224,0,0.08); }
+
+  /* ---------- STATS ---------- */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+  }
+  .stat-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 14px 12px;
+  }
+  .stat-card .value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:22px;
+    color:var(--lime);
+    line-height:1.1;
+  }
+  .stat-card .label{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:4px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    font-weight:500;
+  }
+
+  /* ---------- TRIP CARDS ---------- */
+  .trip-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .trip-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-left:4px solid var(--lime);
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .trip-card.new-entry{
+    animation: slideIn 0.4s ease;
+  }
+  @keyframes slideIn{
+    0%{ opacity:0; transform:translateY(-8px); }
+    100%{ opacity:1; transform:translateY(0); }
+  }
+  .trip-summary{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:14px 16px;
+    cursor:pointer;
+  }
+  .trip-summary:hover{ background:var(--card-hover); }
+  .trip-main{ min-width:0; }
+  .trip-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  .trip-eyebrow .train{ color:var(--lime); font-weight:700; }
+  .trip-route{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .trip-route .arrow{ color:var(--lime-dark); margin:0 4px; }
+  .trip-side{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-shrink:0;
+  }
+  .trip-time{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    color:var(--muted);
+    text-align:right;
+    white-space:nowrap;
+  }
+  .chevron{
+    color:var(--muted);
+    transition:transform 0.2s ease;
+    flex-shrink:0;
+  }
+  .trip-card.open .chevron{ transform:rotate(90deg); color:var(--lime); }
+
+  .trip-detail{
+    display:none;
+    padding:4px 16px 18px;
+    border-top:1px solid var(--border);
+  }
+  .trip-card.open .trip-detail{ display:block; }
+
+  .detail-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(110px,1fr));
+    gap:12px;
+    margin:14px 0;
+  }
+  .detail-item .label{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-bottom:2px;
+  }
+  .detail-item .value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:15px;
+    color:var(--lime);
+  }
+  .obs{
+    margin-bottom:14px;
+    font-size:13.5px;
+    line-height:1.5;
+  }
+  .obs .label{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-bottom:4px;
+  }
+  .photos{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .photos img{
+    width:84px;height:84px;
+    object-fit:cover;
+    border-radius:8px;
+    border:1px solid var(--border);
+    cursor:pointer;
+  }
+
+  /* ---------- EMPTY STATE ---------- */
+  .empty-state{
+    background:var(--card);
+    border:1px dashed var(--border);
+    border-radius:12px;
+    padding:36px 20px;
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .empty-state strong{ color:var(--text); display:block; margin-bottom:4px; font-family:'Sora',sans-serif; }
+
+  /* ---------- CALENDAR ---------- */
+  .calendar-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .calendar-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+  }
+  .calendar-header button{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text);
+    width:32px; height:32px;
+    padding:0;
+    font-size:16px;
+    border-radius:6px;
+    line-height:1;
+  }
+  .calendar-header button:hover{ background:var(--card-hover); }
+  .calendar-title{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    text-transform:capitalize;
+  }
+  .calendar-grid{
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:4px;
+  }
+  .calendar-weekday{
+    font-size:10px;
+    color:var(--muted);
+    text-align:center;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding-bottom:4px;
+  }
+  .calendar-day{
+    position:relative;
+    aspect-ratio:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:8px;
+    font-size:13px;
+    font-family:'JetBrains Mono',monospace;
+    color:var(--text);
+    cursor:pointer;
+    border:1px solid transparent;
+  }
+  .calendar-day:hover{ background:var(--card-hover); }
+  .calendar-day.empty{ visibility:hidden; cursor:default; }
+  .calendar-day.today{ border-color:var(--lime); color:var(--lime); }
+  .calendar-day.selected{ background:var(--lime); color:#0B0D0F; font-weight:700; }
+  .calendar-day .dots{
+    position:absolute;
+    bottom:4px;
+    display:flex;
+    gap:2px;
+  }
+  .calendar-day .dot{ width:5px; height:5px; border-radius:50%; }
+  .dot-service{ background:var(--lime); }
+  .dot-trips{ background:var(--muted); }
+  .calendar-day.selected .dot-service,
+  .calendar-day.selected .dot-trips{ background:#0B0D0F; }
+
+  /* ---------- ARCHIVE ---------- */
+  .archive-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+    margin-top:10px;
+  }
+  .archive-title{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:10px;
+    text-transform:capitalize;
+  }
+  .archive-service{
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:12px;
+  }
+  .archive-service-top{
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px;
+    font-size:13px;
+    margin-bottom:8px;
+  }
+  .archive-prestation{ font-weight:700; color:var(--lime); font-family:'JetBrains Mono',monospace; }
+  .archive-duree{ color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:12px; }
+  .archive-legs{ display:flex; flex-direction:column; gap:6px; }
+  .archive-leg{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    font-size:12.5px;
+    color:var(--text);
+    flex-wrap:wrap;
+  }
+  .archive-leg-train{ color:var(--lime); font-family:'JetBrains Mono',monospace; font-weight:700; }
+  .archive-leg-time{ color:var(--muted); font-family:'JetBrains Mono',monospace; }
+  .archive-trips{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .archive-empty{
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* ---------- BUTTONS ---------- */
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:8px;
+    padding:10px 16px;
+    cursor:pointer;
+    transition:filter 0.15s ease, transform 0.05s ease;
+  }
+  button:active{ transform:scale(0.98); }
+  .btn-primary{
+    background:var(--lime);
+    color:#0B0D0F;
+  }
+  .btn-primary:hover{ background:var(--lime-dark); }
+  .btn-secondary{
+    background:var(--card);
+    color:var(--text);
+    border:1px solid var(--border);
+  }
+  .btn-secondary:hover{ background:var(--card-hover); }
+  .btn-danger{
+    background:transparent;
+    color:var(--danger);
+    border:1px solid var(--danger);
+  }
+  .btn-danger:hover{ background:rgba(255,107,107,0.08); }
+
+  .toolbar{
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  /* ---------- FAB ---------- */
+  .fab{
+    position:fixed;
+    bottom:22px; right:22px;
+    width:58px; height:58px;
+    border-radius:50%;
+    background:var(--lime);
+    color:#0B0D0F;
+    font-size:28px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 4px 18px rgba(198,224,0,0.35);
+    z-index:50;
+    line-height:1;
+    padding:0;
+  }
+  .fab:hover{ background:var(--lime-dark); }
+
+  /* ---------- MODAL FORM ---------- */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.7);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:100;
+  }
+  .modal-overlay.open{ display:flex; }
+  @media (min-width:640px){
+    .modal-overlay{ align-items:center; }
+  }
+  .modal{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px 16px 0 0;
+    width:100%;
+    max-width:520px;
+    max-height:92vh;
+    overflow-y:auto;
+    padding:20px;
+  }
+  @media (min-width:640px){
+    .modal{ border-radius:16px; margin:20px; }
+  }
+  .modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+  }
+  .modal-header h2{
+    font-family:'Sora',sans-serif;
+    font-size:17px;
+    font-weight:700;
+    margin:0;
+    color:var(--text);
+  }
+  .modal-close{
+    background:transparent;
+    border:none;
+    color:var(--muted);
+    font-size:22px;
+    padding:0 6px;
+    cursor:pointer;
+    line-height:1;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:12px;
+  }
+  .form-grid .full{ grid-column:1 / -1; }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--text);
+    margin-bottom:5px;
+  }
+  .field input, .field textarea{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+  }
+  .field input:focus, .field textarea:focus{
+    outline:2px solid var(--lime);
+    outline-offset:1px;
+    border-color:var(--lime);
+  }
+  .field textarea{ resize:vertical; min-height:70px; }
+  .field input[type="file"]{ padding:8px; font-size:13px; }
+  .field input[type="date"]::-webkit-calendar-picker-indicator,
+  .field input[type="time"]::-webkit-calendar-picker-indicator{
+    filter:invert(0.8);
+  }
+  .form-actions{
+    display:flex;
+    gap:10px;
+    margin-top:18px;
+  }
+  .form-actions button{ flex:1; }
+  .hint{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:10px;
+    text-align:center;
+  }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:520px){
+    .form-grid{ grid-template-columns:1fr; }
+    .stats{ gap:8px; }
+    .stat-card{ padding:10px 10px 9px; }
+    .stat-card .value{ font-size:18px; }
+    .trip-time{ display:none; }
+  }
+
+  /* ---------- BACK BUTTON ---------- */
+  .back-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--muted);
+    font-size:13px;
+    font-weight:600;
+    padding:7px 14px;
+    border-radius:20px;
+    cursor:pointer;
+    transition:color .15s, border-color .15s;
+  }
+  .back-btn:hover{ color:var(--text); border-color:var(--lime); }
+
+  /* ---------- HOME GRID ---------- */
+  #pageHome{
+    max-width:520px;
+    margin:0 auto;
+    padding:0 16px 40px;
+  }
+  .home-grid{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin-top:8px;
+  }
+  .home-tile{
+    background:var(--card);
+    border:1.5px solid var(--border);
+    border-radius:18px;
+    padding:24px 22px;
+    display:flex;
+    align-items:center;
+    gap:20px;
+    cursor:pointer;
+    text-align:left;
+    transition:border-color .18s, background .18s, transform .12s;
+    width:100%;
+  }
+  .home-tile:hover{
+    border-color:var(--lime);
+    background:var(--card-hover);
+    transform:translateY(-2px);
+  }
+  .home-tile:active{ transform:translateY(0); }
+  .home-tile-icon{
+    width:64px;
+    height:64px;
+    flex-shrink:0;
+    color:var(--lime);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .home-tile-icon svg{
+    width:100%;
+    height:100%;
+  }
+  .home-tile-label{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    color:var(--text);
+    line-height:1.2;
+  }
+  .home-tile-sub{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:3px;
+    font-weight:500;
+  }
+
+  /* ---------- IMPORT HERO ---------- */
+  .import-hero{
+    max-width:400px;
+    margin:48px auto 32px;
+    padding:0 20px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+  }
+  .import-hero-icon{
+    font-size:56px;
+    line-height:1;
+  }
+  .import-hero-title{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:20px;
+    color:var(--text);
+    margin:0;
+  }
+  .import-hero-desc{
+    font-size:13.5px;
+    color:var(--muted);
+    margin:0;
+    line-height:1.6;
+  }
+  .import-hero-btn{
+    margin-top:8px;
+    padding:14px 32px;
+    font-size:15px;
+    border-radius:12px;
+  }
+
+  .service-action-btn{
+    width:100%;
+    padding:14px;
+    font-size:15px;
+    border-radius:12px;
+    text-align:center;
+  }
+
+  /* ---------- PAGE RÉSUMÉ ---------- */
+  .resume-controls{
+    max-width:520px;
+    margin:20px auto 0;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .resume-toggle{
+    display:flex;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:3px;
+    gap:3px;
+  }
+  .resume-toggle-btn{
+    flex:1;
+    padding:9px 0;
+    border:none;
+    border-radius:8px;
+    background:transparent;
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .resume-toggle-btn.active{
+    background:var(--lime);
+    color:#000;
+  }
+  .resume-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px 14px;
+  }
+  .resume-nav-btn{
+    background:transparent;
+    border:none;
+    color:var(--lime);
+    font-size:20px;
+    cursor:pointer;
+    padding:0 6px;
+    line-height:1;
+  }
+  .resume-nav-label{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:16px;
+    color:var(--text);
+  }
+  .resume-kpis{
+    max-width:520px;
+    margin:16px auto 0;
+    padding:0 16px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+  }
+  .resume-kpi{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .resume-kpi .kpi-value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:26px;
+    color:var(--lime);
+    line-height:1.1;
+  }
+  .resume-kpi .kpi-label{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:4px;
+    font-weight:500;
+  }
+  .resume-kpi.full{ grid-column:1/-1; }
+  .resume-list{
+    max-width:520px;
+    margin:16px auto 0;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .resume-row{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .resume-row-label{
+    font-weight:600;
+    font-size:14px;
+    color:var(--text);
+  }
+  .resume-row-sub{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .resume-row-count{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:20px;
+    color:var(--lime);
+  }
+  .resume-empty{
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+    padding:40px 20px;
+  }
+
+  /* ---------- E500 WORK BLOCK ---------- */
+  .e500-work-block{
+    max-width:520px;
+    margin:16px auto 0;
+    padding:0 16px;
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+  }
+  .e500-work-kpi{
+    background:var(--card);
+    border:1.5px solid var(--lime);
+    border-radius:12px;
+    padding:16px;
+  }
+  .e500-work-kpi .kpi-value{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:28px;
+    color:var(--lime);
+    line-height:1.1;
+  }
+  .e500-work-kpi .kpi-label{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:5px;
+    font-weight:500;
+  }
+  .e500-work-kpi.full{ grid-column:1/-1; }
+
+  /* ---------- LIGHTBOX ---------- */
+  .lightbox{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.9);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:200;
+    padding:20px;
+  }
+  .lightbox.open{ display:flex; }
+  .lightbox img{
+    max-width:100%; max-height:100%;
+    border-radius:8px;
+  }
+
+  .footer-hint{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:28px;
+    text-align:center;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== HEADER ==================== -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <div class="wordmark"><span class="mark"></span>LINEAS</div>
+      <p class="subtitle" id="pageSubtitle">Carnet de bord</p>
+    </div>
+    <button class="back-btn" id="backBtn" hidden aria-label="Retour">&#8592; Accueil</button>
+  </div>
+</header>
+
+<!-- ==================== PAGE ACCUEIL ==================== -->
+<div id="pageHome">
+  <div class="profile-card">
+    <label for="driverName">Conducteur</label>
+    <input type="text" id="driverName" placeholder="Nom Prénom (ex. Beuze Michael)" autocomplete="name">
+  </div>
+
+  <div class="home-grid">
+
+    <button class="home-tile" id="tileService" onclick="showPage('service')">
+      <div class="home-tile-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Document -->
+          <rect x="10" y="6" width="38" height="50" rx="5" fill="currentColor" opacity="0.12"/>
+          <rect x="10" y="6" width="38" height="50" rx="5" stroke="currentColor" stroke-width="2.5"/>
+          <!-- Coin replié -->
+          <path d="M38 6 L48 16 L38 16 Z" fill="currentColor" opacity="0.25"/>
+          <path d="M38 6 L48 16 H38 Z" stroke="currentColor" stroke-width="2"/>
+          <!-- Lignes texte -->
+          <line x1="18" y1="26" x2="40" y2="26" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="18" y1="33" x2="40" y2="33" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line x1="18" y1="40" x2="32" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <!-- Flèche import -->
+          <circle cx="46" cy="48" r="10" fill="var(--bg)"/>
+          <circle cx="46" cy="48" r="10" stroke="currentColor" stroke-width="2"/>
+          <line x1="46" y1="42" x2="46" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <polyline points="42,49 46,53 50,49" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="home-tile-label">Service</div>
+      <div class="home-tile-sub">Importer ma fiche PDF</div>
+    </button>
+
+    <button class="home-tile" id="tileTrains" onclick="showPage('trains')">
+      <div class="home-tile-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Corps loco -->
+          <rect x="4" y="22" width="48" height="22" rx="5" fill="currentColor" opacity="0.15"/>
+          <rect x="4" y="22" width="48" height="22" rx="5" stroke="currentColor" stroke-width="2.5"/>
+          <!-- Cabine -->
+          <rect x="38" y="13" width="14" height="11" rx="3" fill="currentColor" opacity="0.15"/>
+          <rect x="38" y="13" width="14" height="11" rx="3" stroke="currentColor" stroke-width="2.5"/>
+          <!-- Fenêtre cabine -->
+          <rect x="41" y="16" width="8" height="5" rx="1.5" fill="currentColor" opacity="0.5"/>
+          <!-- Roues -->
+          <circle cx="14" cy="44" r="5" fill="currentColor" opacity="0.2"/>
+          <circle cx="14" cy="44" r="5" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="30" cy="44" r="5" fill="currentColor" opacity="0.2"/>
+          <circle cx="30" cy="44" r="5" stroke="currentColor" stroke-width="2.5"/>
+          <circle cx="46" cy="44" r="5" fill="currentColor" opacity="0.2"/>
+          <circle cx="46" cy="44" r="5" stroke="currentColor" stroke-width="2.5"/>
+          <!-- Rail -->
+          <line x1="2" y1="52" x2="62" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Phare -->
+          <circle cx="7" cy="31" r="2.5" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="home-tile-label">Ajouter un train</div>
+      <div class="home-tile-sub">Enregistrer un trajet</div>
+    </button>
+
+    <button class="home-tile" id="tileE500" onclick="showPage('e500')">
+      <div class="home-tile-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Grille calendrier -->
+          <rect x="6" y="10" width="52" height="46" rx="5" fill="currentColor" opacity="0.1"/>
+          <rect x="6" y="10" width="52" height="46" rx="5" stroke="currentColor" stroke-width="2.5"/>
+          <!-- Barre top calendrier -->
+          <rect x="6" y="10" width="52" height="12" rx="5" fill="currentColor" opacity="0.25"/>
+          <path d="M6 18 H58" stroke="currentColor" stroke-width="1"/>
+          <!-- Crochets date -->
+          <line x1="18" y1="6" x2="18" y2="16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="46" y1="6" x2="46" y2="16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Cases grille -->
+          <rect x="12" y="28" width="9" height="7" rx="2" fill="currentColor" opacity="0.35"/>
+          <rect x="27" y="28" width="9" height="7" rx="2" fill="currentColor" opacity="0.15"/>
+          <rect x="42" y="28" width="9" height="7" rx="2" fill="currentColor" opacity="0.15"/>
+          <rect x="12" y="40" width="9" height="7" rx="2" fill="currentColor" opacity="0.15"/>
+          <rect x="27" y="40" width="9" height="7" rx="2" fill="currentColor" opacity="0.35"/>
+          <rect x="42" y="40" width="9" height="7" rx="2" fill="currentColor" opacity="0.15"/>
+          <!-- Label E500 -->
+          <text x="32" y="17" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor" font-family="Inter,sans-serif">E 500</text>
+        </svg>
+      </div>
+      <div class="home-tile-label">E 500</div>
+      <div class="home-tile-sub">Planning série BCHA-BV</div>
+    </button>
+
+    <button class="home-tile" id="tileResume" onclick="showPage('resume')">
+      <div class="home-tile-icon">
+        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6" y="8" width="52" height="48" rx="6" fill="currentColor" opacity="0.1"/>
+          <rect x="6" y="8" width="52" height="48" rx="6" stroke="currentColor" stroke-width="2.5"/>
+          <rect x="14" y="36" width="8" height="14" rx="2" fill="currentColor" opacity="0.35"/>
+          <rect x="26" y="26" width="8" height="24" rx="2" fill="currentColor" opacity="0.6"/>
+          <rect x="38" y="18" width="8" height="32" rx="2" fill="currentColor"/>
+          <line x1="10" y1="50" x2="54" y2="50" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <polyline points="18,38 30,28 42,20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" stroke-dasharray="3 3"/>
+          <circle cx="50" cy="14" r="8" fill="var(--lime)"/>
+          <text x="50" y="18" text-anchor="middle" font-size="10" font-weight="800" fill="#0B0D0F" font-family="Inter,sans-serif">★</text>
+        </svg>
+      </div>
+      <div class="home-tile-label">Résumé</div>
+      <div class="home-tile-sub">Stats par mois ou par an</div>
+    </button>
+
+  </div>
+</div>
+
+<!-- ==================== PAGE RÉSUMÉ ==================== -->
+<div id="pageResume" hidden>
+  <main>
+    <div class="resume-controls">
+      <div class="resume-toggle" id="resumeToggle">
+        <button class="resume-toggle-btn active" id="btnMois" onclick="setResumeMode('mois')">Par mois</button>
+        <button class="resume-toggle-btn" id="btnAnnee" onclick="setResumeMode('annee')">Par année</button>
+      </div>
+      <div class="resume-nav" id="resumeNav">
+        <button class="resume-nav-btn" id="resumePrev" onclick="resumeNavigate(-1)">&#8592;</button>
+        <span class="resume-nav-label" id="resumeNavLabel">—</span>
+        <button class="resume-nav-btn" id="resumeNext" onclick="resumeNavigate(1)">&#8594;</button>
+      </div>
+    </div>
+
+    <div class="resume-kpis" id="resumeKpis"></div>
+    <div class="resume-list" id="resumeList"></div>
+
+    <p class="footer-hint">Basé sur les trajets enregistrés.</p>
+  </main>
+</div>
+<div id="pageTrains" hidden>
+  <main>
+    <div class="stats">
+      <div class="stat-card"><div class="value" id="statCount">0</div><div class="label">Trajets</div></div>
+      <div class="stat-card"><div class="value" id="statMasse">0</div><div class="label">Masse cumulée (t)</div></div>
+      <div class="stat-card"><div class="value" id="statWagons">0</div><div class="label">Wagons cumulés</div></div>
+    </div>
+
+    <p class="section-label">Trajets enregistrés</p>
+    <div class="trip-list" id="board"></div>
+    <div class="empty-state" id="emptyState" hidden>
+      <strong>Aucun trajet enregistré</strong>
+      Appuie sur + pour ajouter ton premier trajet
+    </div>
+
+    <p class="section-label">Calendrier</p>
+    <div class="calendar-card" id="calendarCard"></div>
+    <div class="archive-card" id="archiveCard" hidden></div>
+
+    <div class="toolbar">
+      <button class="btn-secondary" id="exportExcelBtn">Exporter Excel</button>
+      <button class="btn-secondary" id="exportPdfBtn">Exporter PDF</button>
+    </div>
+    <p class="footer-hint">Données enregistrées sur cet appareil.</p>
+  </main>
+  <button class="fab" id="newTripBtn" aria-label="Nouveau trajet">+</button>
+</div>
+
+<!-- ==================== PAGE SERVICE ==================== -->
+<div id="pageService" hidden>
+  <main>
+    <div class="import-hero">
+      <div class="import-hero-icon">📄</div>
+      <h2 class="import-hero-title">Importer ma fiche de service</h2>
+      <p class="import-hero-desc">Importe ton PDF personnel (ex. BCHA-868). Les trains seront extraits automatiquement et ajoutés à ton calendrier.</p>
+      <button class="btn-primary import-hero-btn" id="importPdfBtn">
+        Choisir un PDF
+      </button>
+      <input type="file" id="pdfInput" accept="application/pdf" hidden>
+      <input type="file" id="legCameraInput" accept="image/*" capture="environment" hidden>
+    </div>
+
+    <div class="service-card" id="serviceCard"></div>
+    <p class="section-label" id="legsLabel" hidden>Trains de ce service</p>
+    <div class="leg-list" id="legList"></div>
+
+    <!-- Boutons actions service -->
+    <div id="serviceActions" hidden style="max-width:520px;margin:16px auto;padding:0 16px;display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-secondary service-action-btn" id="extractPdfBtn">
+        📥 Extraire mes feuilles (PDF)
+      </button>
+      <input type="file" id="extractPdfInput" accept="application/pdf" hidden>
+      <button class="btn-secondary service-action-btn" id="icsBtn">
+        📅 Ajouter à mon calendrier iCloud
+      </button>
+    </div>
+
+    <p class="footer-hint">Les données sont enregistrées sur cet appareil.</p>
+  </main>
+</div>
+
+<!-- ==================== PAGE E500 ==================== -->
+<div id="pageE500" hidden>
+  <main>
+    <div class="import-hero">
+      <div class="import-hero-icon">📅</div>
+      <h2 class="import-hero-title">Planning E 500</h2>
+      <p class="import-hero-desc">Importe le PDF général de la série BCHA-BV. Ton service sera extrait automatiquement selon ton nom, et un PDF personnel sera généré.</p>
+      <button class="btn-primary import-hero-btn" id="importE500Btn">
+        Choisir le PDF E 500
+      </button>
+      <input type="file" id="e500Input" accept="application/pdf" hidden>
+    </div>
+
+    <div id="e500Result" hidden>
+      <div id="e500WorkBlock" class="e500-work-block"></div>
+      <div class="service-card" id="e500ServiceCard"></div>
+      <p class="section-label" id="e500LegsLabel" hidden>Trains extraits</p>
+      <div class="leg-list" id="e500LegList"></div>
+    </div>
+    <p class="footer-hint">Les données sont enregistrées sur cet appareil.</p>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nouveau trajet</h2>
+      <button class="modal-close" id="closeModalBtn">×</button>
+    </div>
+    <form id="tripForm">
+      <div class="form-grid">
+        <div class="field"><label>Date</label><input type="date" name="date" required></div>
+        <div class="field"><label>Numéro de train / service</label><input type="text" name="trainNo" inputmode="numeric" placeholder="ex. 8537"></div>
+
+        <div class="field"><label>Locomotive — numéro / type</label><input type="text" name="loco" placeholder="ex. BB 22289"></div>
+        <div class="field"><label>Nombre de wagons</label><input type="number" name="wagons" min="0" inputmode="numeric"></div>
+
+        <div class="field"><label>Longueur totale (m)</label><input type="number" name="longueur" min="0" step="0.1" inputmode="decimal"></div>
+        <div class="field"><label>Masse (t)</label><input type="number" name="masse" min="0" step="0.1" inputmode="decimal"></div>
+
+        <div class="field"><label>Gare d'origine</label><input type="text" name="origine" required placeholder="ex. Lyon-Perrache"></div>
+        <div class="field"><label>Gare de destination</label><input type="text" name="destination" required placeholder="ex. Marseille-St-Charles"></div>
+
+        <div class="field"><label>Heure de départ</label><input type="time" name="depart"></div>
+        <div class="field"><label>Heure de fin</label><input type="time" name="fin"></div>
+
+        <div class="field full"><label>Observations / incidents</label><textarea name="observations" placeholder="Remarques, incidents, retards constatés..."></textarea></div>
+
+        <div class="field full"><label>Photos (incidents, documents)</label><input type="file" name="photos" accept="image/*" multiple></div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">Enregistrer</button>
+        <button type="button" class="btn-secondary" id="cancelFormBtn">Annuler</button>
+      </div>
+      <p class="hint" id="formHint"></p>
+    </form>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" src="" alt="Photo">
+</div>
+
+<script>
+/* ==================== NAVIGATION ==================== */
+const PAGES = {
+  home:    document.getElementById('pageHome'),
+  trains:  document.getElementById('pageTrains'),
+  service: document.getElementById('pageService'),
+  e500:    document.getElementById('pageE500'),
+  resume:  document.getElementById('pageResume'),
+};
+const backBtn       = document.getElementById('backBtn');
+const pageSubtitle  = document.getElementById('pageSubtitle');
+const PAGE_TITLES   = { home:'Carnet de bord', trains:'Mes trains', service:'Fiche de service', e500:'Planning E 500', resume:'Résumé' };
+
+function showPage(name){
+  Object.values(PAGES).forEach(p => p.hidden = true);
+  PAGES[name].hidden = false;
+  backBtn.hidden = (name === 'home');
+  pageSubtitle.textContent = PAGE_TITLES[name] || 'Carnet de bord';
+  if(name === 'trains'){ renderBoard(); renderCalendar(); }
+  if(name === 'service'){ renderService(); renderLegs(); showServiceActions(); }
+  if(name === 'resume'){ renderResume(); }
+  window.scrollTo(0,0);
+}
+
+backBtn.addEventListener('click', () => showPage('home'));
+
+/* ==================== RÉSUMÉ ==================== */
+let resumeMode = 'mois';   // 'mois' | 'annee'
+let resumeYear  = new Date().getFullYear();
+let resumeMonth = new Date().getMonth(); // 0-based
+
+const MOIS_LABELS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+function setResumeMode(mode){
+  resumeMode = mode;
+  document.getElementById('btnMois').classList.toggle('active', mode === 'mois');
+  document.getElementById('btnAnnee').classList.toggle('active', mode === 'annee');
+  renderResume();
+}
+
+function resumeNavigate(dir){
+  if(resumeMode === 'mois'){
+    resumeMonth += dir;
+    if(resumeMonth < 0){ resumeMonth = 11; resumeYear--; }
+    if(resumeMonth > 11){ resumeMonth = 0; resumeYear++; }
+  }else{
+    resumeYear += dir;
+  }
+  renderResume();
+}
+
+function filterTrips(trips){
+  if(resumeMode === 'mois'){
+    const prefix = `${resumeYear}-${String(resumeMonth+1).padStart(2,'0')}`;
+    return trips.filter(t => (t.date || '').startsWith(prefix));
+  }else{
+    return trips.filter(t => (t.date || '').startsWith(String(resumeYear)));
+  }
+}
+
+function renderResume(){
+  const navLabel  = document.getElementById('resumeNavLabel');
+  const kpisEl    = document.getElementById('resumeKpis');
+  const listEl    = document.getElementById('resumeList');
+
+  if(resumeMode === 'mois'){
+    navLabel.textContent = `${MOIS_LABELS[resumeMonth]} ${resumeYear}`;
+  }else{
+    navLabel.textContent = String(resumeYear);
+  }
+
+  const filtered = filterTrips(trips);
+
+  // ---- Heures prestées ----
+  // 1. Depuis les fiches de service (serviceHistory)
+  // Filtrer par période sélectionnée
+  const prefix = resumeMode === 'mois'
+    ? `${resumeYear}-${String(resumeMonth+1).padStart(2,'0')}`
+    : String(resumeYear);
+
+  let serviceMinutes = 0;
+  let nbServices = 0;
+  const serviceDetails = [];
+  for(const [key, svc] of Object.entries(serviceHistory)){
+    if(!key.startsWith(prefix)) continue;
+    if(!svc || !svc.duree) continue;
+    const [h, m] = svc.duree.split(':').map(Number);
+    serviceMinutes += h * 60 + m;
+    nbServices++;
+    serviceDetails.push({ key, duree: svc.duree, prestation: svc.prestation || '—' });
+  }
+
+  // 2. Depuis les trajets (heure départ → heure fin)
+  let tripMinutes = 0;
+  filtered.forEach(t => {
+    if(!t.depart || !t.fin) return;
+    const [dh, dm] = t.depart.split(':').map(Number);
+    const [fh, fm] = t.fin.split(':').map(Number);
+    let start = dh * 60 + dm;
+    let end   = fh * 60 + fm;
+    if(end <= start) end += 24 * 60; // passage minuit
+    tripMinutes += end - start;
+  });
+
+  const totalMinutes = serviceMinutes + tripMinutes;
+  const fmtMin = (min) => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+
+  // ---- KPIs ----
+  const nbTrains = filtered.length;
+  const masse    = filtered.reduce((s,t) => s + (parseFloat(t.masse) || 0), 0);
+  const wagons   = filtered.reduce((s,t) => s + (parseInt(t.wagons) || 0), 0);
+  const longueur = filtered.reduce((s,t) => s + (parseFloat(t.longueur) || 0), 0);
+
+  kpisEl.innerHTML = `
+    <div class="resume-kpi">
+      <div class="kpi-value">${nbTrains}</div>
+      <div class="kpi-label">Trains enregistrés</div>
+    </div>
+    <div class="resume-kpi">
+      <div class="kpi-value">${masse % 1 === 0 ? masse : masse.toFixed(0)} t</div>
+      <div class="kpi-label">Masse cumulée</div>
+    </div>
+    <div class="resume-kpi">
+      <div class="kpi-value">${wagons}</div>
+      <div class="kpi-label">Wagons cumulés</div>
+    </div>
+    <div class="resume-kpi">
+      <div class="kpi-value">${longueur % 1 === 0 ? longueur : longueur.toFixed(0)} m</div>
+      <div class="kpi-label">Longueur cumulée</div>
+    </div>
+  `;
+
+  // ---- Section heures prestées ----
+  const heuresSection = `
+    <p class="section-label" style="margin:20px 0 8px">Heures prestées</p>
+    <div class="resume-kpi full" style="grid-column:1/-1;border-color:var(--lime);margin-bottom:4px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div>
+          <div class="kpi-value">${totalMinutes > 0 ? fmtMin(totalMinutes) : '—'}</div>
+          <div class="kpi-label">Total combiné</div>
+        </div>
+        <div>
+          <div class="kpi-value" style="font-size:20px">${serviceMinutes > 0 ? fmtMin(serviceMinutes) : '—'}</div>
+          <div class="kpi-label">Services PDF (${nbServices})</div>
+        </div>
+        <div>
+          <div class="kpi-value" style="font-size:20px">${tripMinutes > 0 ? fmtMin(tripMinutes) : '—'}</div>
+          <div class="kpi-label">Trajets enregistrés</div>
+        </div>
+      </div>
+    </div>
+    ${serviceDetails.length > 0 ? serviceDetails.map(s => `
+      <div class="resume-row">
+        <div>
+          <div class="resume-row-label">${s.prestation}</div>
+          <div class="resume-row-sub">${s.key}</div>
+        </div>
+        <div class="resume-row-count" style="font-size:16px">${s.duree}</div>
+      </div>`).join('') : ''}
+  `;
+
+  if(filtered.length === 0 && nbServices === 0){
+    listEl.innerHTML = '<p class="resume-empty">Aucune donnée pour cette période.</p>' + heuresSection;
+    return;
+  }
+
+  if(resumeMode === 'mois'){
+    // Dédupliquer : même numéro de train + même date = 1 seule ligne
+    // On garde le trajet avec la destination la plus lointaine (dernière enregistrée)
+    const seen = new Map();
+    filtered.forEach(t => {
+      const key = `${t.date}|${t.trainNo || t.id}`;
+      if(!seen.has(key)){
+        seen.set(key, t);
+      }else{
+        // Garder celui avec l'heure de fin la plus tardive (trajet complet)
+        const prev = seen.get(key);
+        const prevFin = prev.fin || '00:00';
+        const currFin = t.fin || '00:00';
+        if(currFin > prevFin) seen.set(key, {...prev, destination: t.destination, fin: t.fin});
+      }
+    });
+    const deduped = [...seen.values()].sort((a,b) => (a.date+a.depart) < (b.date+b.depart) ? -1 : 1);
+
+    listEl.innerHTML = deduped.map(t => `
+      <div class="resume-row">
+        <div>
+          <div class="resume-row-label">${fmtDate(t.date)}</div>
+          ${(()=>{ const svc = serviceHistory[t.date]; return svc ? `<div class="resume-row-sub" style="margin-top:2px;color:var(--lime);font-size:12px;font-weight:600">${svc.prestation || ''}</div>` : ''; })()}
+          <div class="resume-row-sub" style="margin-top:1px;font-size:12px;color:var(--text)">${t.trainNo ? 'Train ' + t.trainNo + ' · ' : ''}${t.origine || '?'} → ${t.destination || '?'}</div>
+        </div>
+        <div class="resume-row-count">${fmtTime(t.depart) || '—'}</div>
+      </div>`).join('') + heuresSection;
+  }else{
+    const byMonth = {};
+    filtered.forEach(t => {
+      const m = (t.date || '').slice(0,7);
+      if(!byMonth[m]) byMonth[m] = [];
+      byMonth[m].push(t);
+    });
+    listEl.innerHTML = Object.keys(byMonth).sort().map(key => {
+      const [y, m] = key.split('-').map(Number);
+      const label  = `${MOIS_LABELS[m-1]} ${y}`;
+      const list   = byMonth[key];
+      const masseM = list.reduce((s,t) => s + (parseFloat(t.masse)||0), 0);
+      return `
+        <div class="resume-row">
+          <div>
+            <div class="resume-row-label">${label}</div>
+            <div class="resume-row-sub">${masseM % 1 === 0 ? masseM : masseM.toFixed(0)} t · ${list.reduce((s,t)=>s+(parseInt(t.wagons)||0),0)} wagons</div>
+          </div>
+          <div class="resume-row-count">${list.length} trains</div>
+        </div>`;
+    }).join('') + heuresSection;
+  }
+}
+
+// E500 import
+const importE500Btn = document.getElementById('importE500Btn');
+const e500Input     = document.getElementById('e500Input');
+importE500Btn.addEventListener('click', () => e500Input.click());
+e500Input.addEventListener('change', async () => {
+  const file = e500Input.files[0];
+  e500Input.value = '';
+  if(!file) return;
+
+  const driverName = document.getElementById('driverName').value.trim();
+  if(!driverName){
+    alert('Renseigne ton nom dans le champ "Conducteur" sur la page d\'accueil avant d\'importer le E 500.');
+    return;
+  }
+
+  importE500Btn.textContent = 'Analyse…';
+  try{
+    const pages = await extractPdfPages(file);
+
+    // Détecter si c'est un planning mensuel E500 (tableau multi-conducteurs)
+    // Le vrai E500 contient "E500" et "Aantal diensten" et "Naam"
+    const isE500Planning = pages.some(p => /E500/i.test(p.text) && /Aantal diensten/i.test(p.text));
+
+    const e500Result  = document.getElementById('e500Result');
+    const e500Work    = document.getElementById('e500WorkBlock');
+    const e500SvcCard = document.getElementById('e500ServiceCard');
+    const e500LegsLbl = document.getElementById('e500LegsLabel');
+    const e500LegList = document.getElementById('e500LegList');
+    e500Result.hidden = false;
+    e500SvcCard.innerHTML = '';
+    e500LegsLbl.hidden = true;
+    e500LegList.innerHTML = '';
+
+    if(isE500Planning){
+      // ---- CAS 1 : Planning mensuel E500 ----
+      const stats = parseE500Planning(pages, driverName);
+      if(!stats){
+        alert(`Le nom "${driverName}" n'a pas été trouvé dans ce planning E 500.`);
+        importE500Btn.textContent = 'Choisir le PDF E 500';
+        return;
+      }
+      e500Work.innerHTML = buildE500StatsHTML(stats);
+
+    }else{
+      // ---- CAS 2 : Fiche(s) de service individuelle(s) ----
+      const matchedIndices = pages
+        .map((p, idx) => pageMatchesName(p.text, driverName) ? idx : -1)
+        .filter(idx => idx !== -1);
+
+      if(matchedIndices.length === 0){
+        alert(`Le nom "${driverName}" n'a pas été trouvé dans ce PDF.`);
+        importE500Btn.textContent = 'Choisir le PDF E 500';
+        return;
+      }
+
+      const groups = [];
+      for(const idx of matchedIndices){
+        const hasTrNr = /TrNr/.test(pages[idx].text);
+        if(!hasTrNr && groups.length > 0) groups[groups.length-1].push(idx);
+        else groups.push([idx]);
+      }
+
+      const importedKeys = [];
+      const tKey = todayKey();
+      groups.forEach(group => {
+        const parsed = parseServicePdf(group.map(i => pages[i]));
+        if(!parsed) return;
+        const key = serviceDateToInputValue(parsed.date);
+        if(!key) return;
+        serviceHistory[key] = parsed;
+        importedKeys.push(key);
+      });
+
+      if(importedKeys.length === 0){
+        alert('Impossible de lire les services dans ce PDF.');
+        importE500Btn.textContent = 'Choisir le PDF E 500';
+        return;
+      }
+
+      const primaryKey = importedKeys.includes(tKey) ? tKey : [...importedKeys].sort()[0];
+      try{
+        await window.storage.set('service-history', JSON.stringify(serviceHistory));
+        await window.storage.set('service-current-date', primaryKey);
+      }catch(e){ console.error(e); }
+
+      serviceData = serviceHistory[primaryKey];
+      openLegs.clear();
+
+      const allParsed = groups.map(g => parseServicePdf(g.map(i => pages[i]))).filter(Boolean);
+      const totalMinutes = allParsed.reduce((sum, p) => {
+        if(!p.duree) return sum;
+        const [h, m] = p.duree.split(':').map(Number);
+        return sum + h * 60 + m;
+      }, 0);
+      const totalH = Math.floor(totalMinutes / 60);
+      const totalM = totalMinutes % 60;
+      const totalStr = totalMinutes > 0 ? `${String(totalH).padStart(2,'0')}:${String(totalM).padStart(2,'0')}` : '—';
+      const nbServices = allParsed.length;
+
+      e500Work.innerHTML = `
+        <div class="e500-work-kpi">
+          <div class="kpi-value">${serviceData.duree || '—'}</div>
+          <div class="kpi-label">Temps de travail — ce service</div>
+        </div>
+        ${nbServices > 1 ? `<div class="e500-work-kpi">
+          <div class="kpi-value">${totalStr}</div>
+          <div class="kpi-label">Total — ${nbServices} services</div>
+        </div>` : ''}
+      `;
+      e500SvcCard.innerHTML = buildServiceCardHTML(serviceData);
+      if(serviceData.legs && serviceData.legs.length){
+        e500LegsLbl.hidden = false;
+        e500LegList.innerHTML = serviceData.legs.map((leg,i) => buildLegCardHTML(leg,i)).join('');
+      }
+      if(pages.length > 1) await downloadFilteredPdf(file, matchedIndices);
+    }
+
+  }catch(e){
+    console.error(e);
+    alert('Erreur lors de la lecture du PDF E 500.');
+  }
+  importE500Btn.textContent = 'Choisir le PDF E 500';
+});
+
+/* ---- Parseur planning mensuel E500 ---- */
+function parseE500Planning(pages, driverName){
+  const normName = normalizeStr(driverName);
+  const nameParts = normName.split(' ').filter(Boolean);
+  const MOIS_MAP = {
+    'JANUARI':1,'FEBRUARI':2,'MAART':3,'APRIL':4,'MEI':5,'JUNI':6,
+    'JULI':7,'AUGUSTUS':8,'SEPTEMBER':9,'OKTOBER':10,'NOVEMBER':11,'DECEMBER':12,
+    'JANVIER':1,'FEVRIER':2,'MARS':3,'AVRIL':4,'MAI':5,'JUIN':6,
+    'JUILLET':7,'AOUT':8,'SEPTEMBRE':9,'OCTOBRE':10,'NOVEMBRE':11,'DECEMBRE':12
+  };
+  const moisNoms = ['','Janvier','Février','Mars','Avril','Mai','Juin',
+                    'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+  for(const page of pages){
+    const text     = page.text || '';
+    const pageNorm = normalizeStr(text);
+
+    if(!nameParts.every(p => pageNorm.includes(p))) continue;
+
+    // Mois et année
+    let mois = null, annee = null;
+    for(const [mot, num] of Object.entries(MOIS_MAP)){
+      if(text.toUpperCase().includes(mot)){ mois = num; break; }
+    }
+    const yearMatch = text.match(/\b(20\d{2})\b/);
+    if(yearMatch) annee = parseInt(yearMatch[1]);
+
+    // ---- Colonnes jours depuis les items (positions x) ----
+    // Chercher la ligne avec au moins 20 chiffres distincts entre 1-31
+    const items = page.items || [];
+    const byY = {};
+    items.forEach(it => {
+      const v = parseInt(it.str);
+      if(!isNaN(v) && v >= 1 && v <= 31){
+        const yk = Math.round(it.y);
+        if(!byY[yk]) byY[yk] = [];
+        byY[yk].push({x: it.x, v});
+      }
+    });
+
+    let dayColsX = {}; // x -> numéro de jour
+    let bestCount = 0;
+    for(const [yk, pairs] of Object.entries(byY)){
+      const uniq = new Set(pairs.map(p => p.v));
+      if(uniq.size > bestCount){
+        bestCount = uniq.size;
+        dayColsX = {};
+        pairs.forEach(p => { dayColsX[p.x] = p.v; });
+      }
+    }
+
+    // ---- Ligne du conducteur : trouver les items qui matchent le nom ----
+    const matchItems = items.filter(it =>
+      nameParts.some(p => normalizeStr(it.str).includes(p))
+    );
+
+    let servicesByDay = {};
+    let heuresByDay = {}; // dateKey -> {debut, fin}
+
+    if(matchItems.length > 0 && bestCount >= 20){
+      const condY = matchItems[0].y;
+      const colXs = Object.keys(dayColsX).map(Number);
+
+      // Extraire les services (numéros 800-999) ET les codes spéciaux (FOR, FORP)
+      const CODES_SPECIAUX = new Set(['FOR','FORP','FORT','FORTFOR']);
+      const extractServices = (tolY) => {
+        items.forEach(it => {
+          if(Math.abs(it.y - condY) > tolY) return;
+          const s = it.str.trim();
+          const v = parseInt(s);
+          const isService = !isNaN(v) && v >= 800 && v <= 999;
+          const isCode = CODES_SPECIAUX.has(s.toUpperCase());
+          if(!isService && !isCode) return;
+          const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
+          if(Math.abs(closest - it.x) < 15 && annee && mois){
+            const day = dayColsX[closest];
+            const pad = n => String(n).padStart(2,'0');
+            const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
+            if(isCode) servicesByDay[dateKey] = 'FOR';
+            else if(!servicesByDay[dateKey]) servicesByDay[dateKey] = String(v);
+          }
+        });
+      };
+      extractServices(8);
+      if(Object.keys(servicesByDay).length === 0) extractServices(30);
+
+      // Extraire les heures (zone sous la ligne service : condY - 8 à condY - 30)
+      // Les heures sont fragmentées en caractères, on regroupe par x proche
+      const hoursZone = items.filter(it =>
+        it.y > condY - 35 && it.y < condY - 2 && it.x < 650
+      );
+      // Regrouper par colonne (jour)
+      const byDayHours = {};
+      hoursZone.forEach(it => {
+        const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
+        if(Math.abs(closest - it.x) < 15){
+          const day = dayColsX[closest];
+          if(!byDayHours[day]) byDayHours[day] = [];
+          byDayHours[day].push(it);
+        }
+      });
+
+      // Pour chaque jour, reconstruire les tokens H:MM
+      const timeRe = /^\d{1,2}:\d{2}$/;
+      const cleanTime = t => {
+        // Nettoyer tokens parasites: "16:001" -> "16:00", "11:451" -> "11:45"
+        const m = t.match(/^(\d{1,2}:\d{2})\d*$/);
+        return m ? m[1] : null;
+      };
+
+      for(const [day, dayItems] of Object.entries(byDayHours)){
+        const pad = n => String(n).padStart(2,'0');
+        if(!annee || !mois) continue;
+        const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
+        // Inclure les heures pour TOUS les jours (services ET formation)
+        if(!servicesByDay[dateKey]) continue; // pas de service ni formation ce jour
+
+        // Trier par y décroissant puis x croissant
+        dayItems.sort((a,b) => b.y - a.y || a.x - b.x);
+
+        // Grouper en tokens (gap x > 8 ou gap y > 2 = nouveau token)
+        const tokens = [];
+        let cur = [];
+        for(const it of dayItems){
+          if(cur.length > 0){
+            const last = cur[cur.length-1];
+            if(it.x - last.x > 8 || Math.abs(it.y - last.y) > 2){
+              tokens.push(cur.map(i => i.str).join(''));
+              cur = [];
+            }
+          }
+          cur.push(it);
+        }
+        if(cur.length) tokens.push(cur.map(i => i.str).join(''));
+
+        // Filtrer les tokens qui ressemblent à H:MM
+        const times = tokens.map(cleanTime).filter(Boolean);
+        if(times.length >= 2){
+          heuresByDay[dateKey] = { debut: times[0], fin: times[1] };
+        }else if(times.length === 1){
+          heuresByDay[dateKey] = { debut: times[0], fin: null };
+        }
+      }
+    }
+
+    // Fallback : si pas de positions, ordre séquentiel depuis le texte
+    if(Object.keys(servicesByDay).length === 0){
+      const pos0 = pageNorm.indexOf(nameParts[0]);
+      const ip1 = pageNorm.indexOf('initially planned', pos0);
+      const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
+      const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
+      const section = pageNorm.slice(pos0, secEnd);
+      const prestNums = [...section.matchAll(/\b(\d{3,4})\b/g)]
+        .map(m => m[1]).filter(n => { const v = parseInt(n); return v >= 800 && v <= 999; });
+      const uniquePrests = [...new Set(prestNums)];
+      uniquePrests.forEach((p, i) => {
+        if(annee && mois){
+          const pad = n => String(n).padStart(2,'0');
+          servicesByDay[`${annee}-${pad(mois)}-${pad(i + 1)}`] = p;
+        }else{
+          servicesByDay[i + 1] = p;
+        }
+      });
+    }
+
+    // ---- Totaux heures ----
+    const pos0 = pageNorm.indexOf(nameParts[0]);
+    const ip1 = pageNorm.indexOf('initially planned', pos0);
+    const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
+    const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
+    const section = pageNorm.slice(pos0, secEnd);
+
+    const bigTimes = [...section.matchAll(/(?<!-)\b(\d{2,3}:\d{2})\b/g)]
+      .map(m => m[1]).filter(t => parseInt(t) >= 50);
+    const urTh = bigTimes.length >= 2 ? bigTimes[1] : (bigTimes[0] || null);
+    const negTimes = [...section.matchAll(/-(\d{2,3}:\d{2})/g)]
+      .map(m => '-' + m[1]).filter(t => parseInt(t.slice(1)) >= 50);
+    const urWe = negTimes[0] || null;
+
+    return {
+      mois, annee,
+      moisLabel: mois ? `${moisNoms[mois]} ${annee || ''}` : (annee ? String(annee) : ''),
+      nbServices: Object.keys(servicesByDay).length,
+      schedule: servicesByDay,
+      heures: heuresByDay,
+      urTh,
+      urWe
+    };
+  }
+  return null;
+}
+
+
+function buildE500StatsHTML(s){
+  const moisNoms = ['','Janvier','Février','Mars','Avril','Mai','Juin',
+                    'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const moisCourts = ['','jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
+  const label = s.moisLabel || 'Planning';
+
+  // Tableau 4 colonnes : Date | Service | Début/Fin | N°
+  // Exclure FOR du comptage (formation ≠ service)
+  const jours = Object.entries(s.schedule)
+    .filter(([,v]) => /^\d{3,}$/.test(v) || v === 'FOR')
+    .sort((a,b) => String(a[0]).localeCompare(String(b[0])));
+
+  let serviceCount = 0;
+  const joursHTML = jours.map(([d, v]) => {
+    const isFormation = v === 'FOR';
+    const isRealService = /^\d{3,}$/.test(v);
+    serviceCount++; // compter services ET formations
+
+    let dateLabel = d;
+    let dateKey = null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)){
+      const [y, m, day] = d.split('-').map(Number);
+      const jours_semaine = ['dim','lun','mar','mer','jeu','ven','sam'];
+      const dt = new Date(y, m-1, day);
+      dateLabel = `${jours_semaine[dt.getDay()]} ${String(day).padStart(2,'0')} ${moisCourts[m]}`;
+      dateKey = d;
+    }
+
+    const svc = dateKey && serviceHistory[dateKey];
+    let heures = '— / —';
+    if(svc && svc.debut){
+      heures = `${svc.debut} / ${svc.fin || '—'}`;
+    }else if(s.heures && s.heures[dateKey]){
+      const h = s.heures[dateKey];
+      heures = `${h.debut || '—'} / ${h.fin || '—'}`;
+    }
+
+    const serviceLabel = isFormation
+      ? `<span style="color:var(--muted);font-size:12px">Formation</span>`
+      : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:var(--lime)">${v}</span>`;
+    const nLabel = serviceCount;
+
+    return `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:9px 8px;font-size:13px;color:var(--text);white-space:nowrap">${dateLabel}</td>
+        <td style="padding:9px 8px">${serviceLabel}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${heures}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted);text-align:right">${nLabel}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <div class="e500-work-kpi full" style="grid-column:1/-1;border-color:var(--lime);margin-bottom:4px">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px">${label}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <div>
+          <div class="kpi-value">${s.urTh || '—'}</div>
+          <div class="kpi-label">Heures prestées ce mois</div>
+        </div>
+        <div>
+          <div class="kpi-value" style="font-size:20px">${s.nbServices}</div>
+          <div class="kpi-label">Services</div>
+        </div>
+        <div>
+          <div class="kpi-value" style="font-size:18px;color:${s.urWe && s.urWe.startsWith('-') ? 'var(--danger)' : 'var(--lime)'}">${s.urWe || '—'}</div>
+          <div class="kpi-label">Écart cumulé</div>
+        </div>
+      </div>
+    </div>
+    <div style="grid-column:1/-1;margin-top:8px">
+      <p class="section-label" style="margin:0 0 8px">Planning du mois</p>
+      <table style="width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden">
+        <thead>
+          <tr style="background:var(--bg)">
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">DATE</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">SERVICE</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">DÉBUT / FIN</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:600">N°</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${joursHTML}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Polyfill window.storage via localStorage (fichier local ou PWA)
+if(!window.storage){
+  window.storage = {
+    async get(key){
+      try{ const v = localStorage.getItem(key); return v !== null ? {key, value: v} : null; }catch(e){ return null; }
+    },
+    async set(key, value){
+      try{ localStorage.setItem(key, value); return {key, value}; }catch(e){ return null; }
+    },
+    async delete(key){
+      try{ localStorage.removeItem(key); return {key, deleted: true}; }catch(e){ return null; }
+    },
+    async list(prefix){
+      try{
+        const keys = Object.keys(localStorage).filter(k => !prefix || k.startsWith(prefix));
+        return {keys, prefix};
+      }catch(e){ return {keys:[]}; }
+    }
+  };
+}
+
+let trips = [];
+let serviceData = null;
+let serviceHistory = {};
+let calendarMonth = null;
+let selectedArchiveDate = null;
+let pendingPhoto = null;
+let pendingLegIndex = null;
+let openLegs = new Set();
+let driverName = '';
+
+async function loadDriverName(){
+  try{
+    const res = await window.storage.get('driver-name');
+    driverName = res ? res.value : '';
+  }catch(e){
+    driverName = '';
+  }
+}
+async function saveDriverName(name){
+  driverName = name;
+  try{
+    await window.storage.set('driver-name', name);
+  }catch(e){
+    console.error('Erreur sauvegarde nom', e);
+  }
+}
+
+const DEFAULT_SERVICE = {
+  prestation: 'BCHA-868',
+  date: '14/06/2026',
+  duree: '08:40',
+  debut: '15:30',
+  fin: '00:10',
+  legs: [
+    { trNr:'49808', operateur:'Lineas NV (RU 2188)', origine:'MONCEAU-FORMATION', destination:'LA LOUVIERE-GARE INDUSTRIELLE', debut:'16:50', fin:'17:21', loco1:'', loco2:'', hlp:false, hlpConfig:null, wagons:null, longueur:null, masse:null },
+    { trNr:'49808', operateur:'Lineas NV (RU 2188)', origine:'LA LOUVIERE-GARE INDUSTRIELLE', destination:'QUEVY-FRONTIERE', debut:'18:20', fin:'19:19', loco1:'', loco2:'', hlp:false, hlpConfig:null, wagons:null, longueur:null, masse:null },
+    { trNr:'49808', operateur:'Hexafret', origine:'QUEVY-FRONTIERE', destination:'THIONVILLE-FAISCEAU EST', debut:'19:19', fin:'22:42', loco1:'', loco2:'', hlp:false, hlpConfig:null, wagons:null, longueur:null, masse:null }
+  ]
+};
+
+/* ---------------- SERVICE STORAGE ---------------- */
+async function loadService(){
+  try{
+    const res = await window.storage.get('service-history');
+    serviceHistory = res ? JSON.parse(res.value) : {};
+  }catch(e){
+    serviceHistory = {};
+  }
+
+  if(Object.keys(serviceHistory).length === 0){
+    const key = serviceDateToInputValue(DEFAULT_SERVICE.date);
+    serviceHistory[key] = JSON.parse(JSON.stringify(DEFAULT_SERVICE));
+  }
+
+  let currentKey = null;
+  try{
+    const res = await window.storage.get('service-current-date');
+    if(res && serviceHistory[res.value]) currentKey = res.value;
+  }catch(e){}
+
+  if(!currentKey){
+    const keys = Object.keys(serviceHistory).sort();
+    currentKey = keys[keys.length - 1];
+  }
+
+  serviceData = serviceHistory[currentKey];
+}
+async function saveService(){
+  const key = serviceDateToInputValue(serviceData.date) || 'sans-date';
+  serviceHistory[key] = serviceData;
+  try{
+    await window.storage.set('service-history', JSON.stringify(serviceHistory));
+    await window.storage.set('service-current-date', key);
+  }catch(e){
+    console.error('Erreur sauvegarde service', e);
+  }
+}
+
+/* ---------------- STORAGE ---------------- */
+async function loadTrips(){
+  try{
+    const res = await window.storage.get('trips-data');
+    trips = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    trips = [];
+  }
+}
+async function saveTrips(){
+  try{
+    await window.storage.set('trips-data', JSON.stringify(trips));
+  }catch(e){
+    console.error('Erreur de sauvegarde', e);
+  }
+}
+async function loadPhotos(id){
+  try{
+    const res = await window.storage.get('photos:'+id);
+    return res ? JSON.parse(res.value) : [];
+  }catch(e){
+    return [];
+  }
+}
+async function savePhotos(id, photos){
+  try{
+    await window.storage.set('photos:'+id, JSON.stringify(photos));
+  }catch(e){
+    console.error('Erreur sauvegarde photos', e);
+  }
+}
+async function deletePhotos(id){
+  try{ await window.storage.delete('photos:'+id); }catch(e){}
+}
+
+/* ---------------- IMAGE RESIZE ---------------- */
+function resizeImage(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 800;
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------------- RENDER ---------------- */
+const board = document.getElementById('board');
+const emptyState = document.getElementById('emptyState');
+const statCount = document.getElementById('statCount');
+const statMasse = document.getElementById('statMasse');
+const statWagons = document.getElementById('statWagons');
+
+function fmtDate(d){
+  if(!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
+function fmtTime(t){ return t || '—'; }
+
+function renderStats(){
+  statCount.textContent = trips.length;
+  const masse = trips.reduce((s,t)=> s + (t.masse || 0), 0);
+  const wagons = trips.reduce((s,t)=> s + (t.wagons || 0), 0);
+  statMasse.textContent = masse % 1 === 0 ? masse : masse.toFixed(1);
+  statWagons.textContent = wagons;
+}
+
+/* ---------------- SERVICE CARD ---------------- */
+const serviceCard = document.getElementById('serviceCard');
+/* ---- Boutons actions service ---- */
+const serviceActionsEl  = document.getElementById('serviceActions');
+const extractPdfBtn     = document.getElementById('extractPdfBtn');
+const extractPdfInput   = document.getElementById('extractPdfInput');
+const icsBtn            = document.getElementById('icsBtn');
+
+// Montrer les boutons dès qu'un service est chargé
+function showServiceActions(){
+  if(serviceActionsEl) serviceActionsEl.hidden = !serviceData;
+}
+
+// ---- Bouton 1 : Extraire mes feuilles (PDF) ----
+extractPdfBtn.addEventListener('click', () => extractPdfInput.click());
+extractPdfInput.addEventListener('change', async () => {
+  const file = extractPdfInput.files[0];
+  extractPdfInput.value = '';
+  if(!file) return;
+
+  const dn = driverName.trim();
+  if(!dn){ alert('Renseigne ton nom dans le champ "Conducteur" sur la page d\'accueil.'); return; }
+
+  extractPdfBtn.textContent = 'Extraction…';
+  try{
+    const pages = await extractPdfPages(file);
+    const matchedIndices = pages
+      .map((p, idx) => pageMatchesName(p.text, dn) ? idx : -1)
+      .filter(idx => idx !== -1);
+
+    if(matchedIndices.length === 0){
+      alert(`Le nom "${dn}" n'a pas été trouvé dans ce PDF.`);
+    }else{
+      await downloadFilteredPdf(file, matchedIndices);
+    }
+  }catch(e){
+    console.error(e);
+    alert('Erreur lors de l\'extraction du PDF.');
+  }
+  extractPdfBtn.textContent = '📥 Extraire mes feuilles (PDF)';
+});
+
+// ---- Bouton 2 : Générer un événement iCloud (.ics) ----
+icsBtn.addEventListener('click', () => {
+  if(!serviceData){ alert('Aucun service chargé.'); return; }
+
+  const s = serviceData;
+  const dateRaw = serviceDateToInputValue(s.date); // YYYY-MM-DD
+  if(!dateRaw){ alert('Date de service invalide.'); return; }
+
+  // Calculer les dates/heures de début et fin en UTC
+  // On considère que les heures sont en heure locale Europe/Brussels
+  const [y, m, d] = dateRaw.split('-').map(Number);
+  const debut = s.debut || '00:00';
+  const fin   = s.fin   || '00:00';
+  const [dh, dm] = debut.split(':').map(Number);
+  let [fh, fm]   = fin.split(':').map(Number);
+
+  // Si fin < début → passage minuit, on ajoute 1 jour à la fin
+  const debutMin = dh * 60 + dm;
+  const finMin   = fh * 60 + fm;
+  const nextDay  = finMin <= debutMin;
+
+  const pad = n => String(n).padStart(2,'0');
+  const dtStart = `${y}${pad(m)}${pad(d)}T${pad(dh)}${pad(dm)}00`;
+  const endDate = nextDay ? new Date(y, m-1, d+1) : new Date(y, m-1, d);
+  const dtEnd   = `${endDate.getFullYear()}${pad(endDate.getMonth()+1)}${pad(endDate.getDate())}T${pad(fh)}${pad(fm)}00`;
+  const dtStamp = new Date().toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+
+  // Résumé de l'événement
+  const summary = `${s.prestation || 'Service'} — Lineas`;
+  const trainsDesc = (s.legs || [])
+    .filter((l,i,arr) => arr.findIndex(x => x.trNr === l.trNr) === i) // dédupliqué
+    .map(l => `Train ${l.trNr}: ${l.origine} → ${l.destination} (${l.debut}–${l.fin})`)
+    .join('\\n');
+  const description = `Prestation: ${s.prestation || '—'}\\nDurée: ${s.duree || '—'}\\n\\n${trainsDesc}`;
+  const location = s.legs && s.legs[0] ? s.legs[0].origine : '';
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Carnet de bord Lineas//FR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `DTSTART;TZID=Europe/Brussels:${dtStart}`,
+    `DTEND;TZID=Europe/Brussels:${dtEnd}`,
+    `DTSTAMP:${dtStamp}`,
+    `UID:${dtStamp}-${s.prestation || 'service'}@lineas-carnet`,
+    `SUMMARY:${summary}`,
+    `DESCRIPTION:${description}`,
+    `LOCATION:${location}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${s.prestation || 'service'}-${dateRaw}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+function renderService(){
+  if(!serviceData){
+    serviceCard.innerHTML = '<p class="service-empty">Aucun service importé. Utilisez « Importer un PDF ».</p>';
+    return;
+  }
+  const s = serviceData;
+  // Formater la date lisiblement (DD/MM/YYYY → Lundi 7 juillet 2026)
+  const dateRaw = serviceDateToInputValue(s.date); // YYYY-MM-DD
+  let dateFmt = s.date || '';
+  if(dateRaw){
+    const [y,m,d] = dateRaw.split('-').map(Number);
+    const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const moisNoms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    const dt = new Date(y, m-1, d);
+    dateFmt = `${jours[dt.getDay()]} ${d} ${moisNoms[m-1]} ${y}`;
+  }
+
+  serviceCard.innerHTML = `
+    <div class="service-top">
+      <div class="service-top-row">
+        <div class="service-date-block">
+          <div class="service-date-big">${dateFmt}</div>
+          <div class="service-id">${s.prestation || '—'}</div>
+        </div>
+        <input type="date" id="serviceDate" class="service-date-input" value="${dateRaw}">
+      </div>
+      <div class="service-stats">
+        <div class="service-stat">
+          <div class="time-inputs">
+            <input type="time" id="serviceDebut" value="${s.debut || ''}">
+            <span>–</span>
+            <input type="time" id="serviceFin" value="${s.fin || ''}">
+          </div>
+          <div class="label">Début – Fin</div>
+        </div>
+        <div class="service-stat"><div class="value">${s.duree || '—'}</div><div class="label">Heures de service</div></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('serviceDate').addEventListener('change', (e) => {
+    changeServiceDate(e.target.value);
+  });
+  document.getElementById('serviceDebut').addEventListener('change', (e) => {
+    serviceData.debut = e.target.value;
+    updateServiceDuration();
+  });
+  document.getElementById('serviceFin').addEventListener('change', (e) => {
+    serviceData.fin = e.target.value;
+    updateServiceDuration();
+  });
+}
+
+function computeDuration(start, end){
+  if(!start || !end) return null;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let startMin = sh * 60 + sm;
+  let endMin = eh * 60 + em;
+  if(endMin <= startMin) endMin += 24 * 60;
+  const diff = endMin - startMin;
+  return `${String(Math.floor(diff/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
+}
+
+async function updateServiceDuration(){
+  const computed = computeDuration(serviceData.debut, serviceData.fin);
+  if(computed) serviceData.duree = computed;
+  await saveService();
+  renderService();
+}
+
+/* ---------------- LEGS (trains du service) ---------------- */
+const legList = document.getElementById('legList');
+const legsLabel = document.getElementById('legsLabel');
+function legLocoString(leg){
+  const base = [leg.loco1, leg.loco2].filter(Boolean).join(' + ');
+  if(leg.hlp && leg.hlpConfig) return base ? `${base} (${leg.hlpConfig})` : leg.hlpConfig;
+  return base;
+}
+
+function applyHlp(leg){
+  const locoCount = [leg.loco1, leg.loco2].filter(Boolean).length || 1;
+  leg.longueur = locoCount >= 2 ? 40 : 20;
+  leg.masse = 100;
+  leg.wagons = 0;
+  const validOptions = locoCount >= 2 ? ['LLE','ELL'] : ['LE','EL'];
+  if(!validOptions.includes(leg.hlpConfig)){
+    leg.hlpConfig = validOptions[0];
+  }
+}
+
+function renderLegs(){
+  legList.innerHTML = '';
+  const legs = (serviceData && serviceData.legs) || [];
+  legsLabel.hidden = legs.length === 0;
+
+  // Grouper les LEGs consécutifs avec le même numéro de train
+  const groups = [];
+  legs.forEach((leg, i) => {
+    const last = groups[groups.length - 1];
+    if(last && leg.trNr && last[0].trNr === leg.trNr){
+      last.push(leg);
+    }else{
+      groups.push([leg]);
+    }
+  });
+
+  groups.forEach((group, gi) => {
+    const first = group[0];
+    const last  = group[group.length - 1];
+    const isMerged = group.length > 1;
+    // Index du premier leg dans le tableau original
+    const firstIdx = legs.indexOf(first);
+
+    const card = document.createElement('div');
+    card.className = 'leg-card' + (openLegs.has(firstIdx) ? ' open' : '');
+
+    // Passage(s) frontière : heure de fin du 1er segment = passage frontière
+    const passagesHTML = isMerged ? group.slice(0, -1).map((seg, si) => {
+      const segIdx = legs.indexOf(seg);
+      return `
+        <div class="leg-frontier">
+          <span class="leg-frontier-label">⇒ Passage frontière · ${escapeHtml(fixGareName(seg.destination) || '?')}</span>
+          <input type="time" value="${seg.fin || ''}" data-leg="${segIdx}" data-field="fin" class="frontier-time">
+        </div>`;
+    }).join('') : '';
+
+    card.innerHTML = `
+      <div class="leg-top" data-toggle="${firstIdx}">
+        <div class="leg-train"><span class="leg-chevron">›</span>Train ${first.trNr || '—'}${isMerged ? ' <span class="frontier-badge">⇒ frontière</span>' : ''}</div>
+        <div class="time-inputs">
+          <input type="time" value="${first.debut || ''}" data-leg="${firstIdx}" data-field="debut">
+          <span>–</span>
+          <input type="time" value="${last.fin || ''}" data-leg="${legs.indexOf(last)}" data-field="fin">
+        </div>
+      </div>
+      ${first.operateur ? `<div class="leg-operateur">${escapeHtml(first.operateur)}</div>` : ''}
+      <div class="leg-extra">
+        <div class="leg-extra-grid">
+          <div class="field-mini"><label>Locomotive 1 — numéro / type</label><input type="text" inputmode="numeric" value="${first.loco1 || ''}" data-leg="${firstIdx}" data-field="loco1" placeholder="ex. BB 22289"></div>
+          <div class="field-mini"><label>Locomotive 2 — numéro / type</label><input type="text" inputmode="numeric" value="${first.loco2 || ''}" data-leg="${firstIdx}" data-field="loco2" placeholder="ex. BB 22290"></div>
+          <label class="leg-hlp">
+            <input type="checkbox" ${first.hlp ? 'checked' : ''} data-leg="${firstIdx}" data-field="hlp">
+            <span class="hlp-tag">HLP</span> — locomotive(s) seule(s), sans wagons
+          </label>
+          ${first.hlp ? `<div class="hlp-config">
+            ${(([first.loco1, first.loco2].filter(Boolean).length >= 2) ? ['LLE','ELL'] : ['LE','EL']).map(opt => `
+              <label class="hlp-option ${first.hlpConfig === opt ? 'active' : ''}">
+                <input type="radio" name="hlpConfig-${firstIdx}" value="${opt}" data-leg="${firstIdx}" data-field="hlpConfig" ${first.hlpConfig === opt ? 'checked' : ''}>
+                ${opt}
+              </label>
+            `).join('')}
+          </div>` : ''}
+          <div class="field-mini"><label>Nombre de wagons</label><input type="number" min="0" inputmode="numeric" value="${first.wagons ?? ''}" data-leg="${firstIdx}" data-field="wagons" placeholder="ex. 18"></div>
+          <div class="field-mini"><label>Longueur totale (m)</label><input type="number" min="0" step="0.1" inputmode="decimal" value="${first.longueur ?? ''}" data-leg="${firstIdx}" data-field="longueur" placeholder="ex. 450"></div>
+          <div class="field-mini"><label>Masse (t)</label><input type="number" min="0" step="0.1" inputmode="decimal" value="${first.masse ?? ''}" data-leg="${firstIdx}" data-field="masse" placeholder="ex. 1200"></div>
+        </div>
+      </div>
+      <div class="leg-fields">
+        <input type="text" value="${fixGareName(first.origine) || ''}" data-leg="${firstIdx}" data-field="origine" placeholder="Gare d'origine">
+        <span class="leg-arrow">→</span>
+        <input type="text" value="${fixGareName(last.destination) || ''}" data-leg="${legs.indexOf(last)}" data-field="destination" placeholder="Gare de destination">
+      </div>
+      ${passagesHTML}
+      <div class="leg-actions">
+        <button class="btn-camera" type="button" data-leg="${firstIdx}">📷 Photo TC286</button>
+        <button class="btn-save-trip" type="button" data-leg="${firstIdx}" data-last-leg="${legs.indexOf(last)}">✓ Enregistrer comme trajet</button>
+      </div>
+    `;
+    legList.appendChild(card);
+  });
+
+  // CSS frontier badge & line (inline si pas encore dans <style>)
+  if(!document.getElementById('frontier-style')){
+    const s = document.createElement('style');
+    s.id = 'frontier-style';
+    s.textContent = `
+      .frontier-badge{ font-size:11px; color:var(--lime); font-weight:600; vertical-align:middle; }
+      .leg-frontier{ display:flex; align-items:center; gap:10px; padding:6px 14px; border-top:1px dashed var(--border); }
+      .leg-frontier-label{ font-size:12px; color:var(--muted); flex:1; }
+      .frontier-time{ background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--lime); font-family:'JetBrains Mono',monospace; font-size:13px; padding:4px 8px; width:90px; }
+    `;
+    document.head.appendChild(s);
+  }
+
+  legList.querySelectorAll('[data-toggle]').forEach(top => {
+    top.addEventListener('click', () => {
+      const i = Number(top.dataset.toggle);
+      const card = top.closest('.leg-card');
+      card.classList.toggle('open');
+      if(card.classList.contains('open')) openLegs.add(i); else openLegs.delete(i);
+    });
+  });
+
+  legList.querySelectorAll('input[data-field]').forEach(input => {
+    input.addEventListener('click', (e) => e.stopPropagation());
+
+    if(input.type === 'checkbox'){
+      input.addEventListener('change', () => {
+        const i = Number(input.dataset.leg);
+        const leg = serviceData.legs[i];
+        leg.hlp = input.checked;
+        if(input.checked) applyHlp(leg);
+        saveService();
+        renderLegs();
+      });
+      return;
+    }
+
+    if(input.type === 'radio' && input.dataset.field === 'hlpConfig'){
+      input.addEventListener('change', () => {
+        const i = Number(input.dataset.leg);
+        serviceData.legs[i].hlpConfig = input.value;
+        saveService();
+        renderLegs();
+      });
+      return;
+    }
+
+    input.addEventListener('change', () => {
+      const i = Number(input.dataset.leg);
+      const field = input.dataset.field;
+      const leg = serviceData.legs[i];
+      const numericFields = ['wagons','longueur','masse'];
+      leg[field] = numericFields.includes(field)
+        ? (input.value === '' ? null : Number(input.value))
+        : input.value.trim();
+
+      if((field === 'loco1' || field === 'loco2') && leg.hlp){
+        applyHlp(leg);
+        saveService();
+        renderLegs();
+        return;
+      }
+      saveService();
+    });
+  });
+
+  legList.querySelectorAll('.btn-camera').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pendingLegIndex = Number(btn.dataset.leg);
+      legCameraInput.click();
+    });
+  });
+
+  legList.querySelectorAll('.btn-save-trip').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const firstLeg = serviceData.legs[Number(btn.dataset.leg)];
+      const lastLeg  = serviceData.legs[Number(btn.dataset.lastLeg ?? btn.dataset.leg)];
+      const tripDate = serviceDateToInputValue(serviceData.date);
+
+      // Vérifier si un trajet avec le même numéro de train et la même date existe déjà
+      const existing = trips.filter(t =>
+        t.trainNo === firstLeg.trNr && t.date === tripDate
+      );
+      if(existing.length > 0){
+        const ok = confirm(`Un trajet ${firstLeg.trNr} du ${tripDate} existe déjà. Veux-tu en créer un nouveau quand même ?`);
+        if(!ok) return;
+      }
+
+      pendingPhoto = null;
+      openModal({
+        trainNo:     firstLeg.trNr,
+        origine:     fixGareName(firstLeg.origine),
+        destination: fixGareName(lastLeg.destination),
+        depart:      firstLeg.debut,
+        fin:         lastLeg.fin,
+        date:        tripDate,
+        loco:        legLocoString(firstLeg),
+        wagons:      firstLeg.wagons,
+        longueur:    firstLeg.longueur,
+        masse:       firstLeg.masse
+      });
+    });
+  });
+}
+
+function serviceDateToInputValue(d){
+  if(!d) return '';
+  const parts = d.split('/');
+  if(parts.length !== 3) return '';
+  const [day, month, year] = parts;
+  return `${year}-${month}-${day}`;
+}
+
+function inputValueToServiceDate(iso){
+  if(!iso) return '';
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+async function changeServiceDate(newIso){
+  if(!newIso) return;
+  const oldKey = serviceDateToInputValue(serviceData.date);
+
+  serviceData.date = inputValueToServiceDate(newIso);
+
+  if(oldKey && oldKey !== newIso && serviceHistory[oldKey] === serviceData){
+    delete serviceHistory[oldKey];
+  }
+  serviceHistory[newIso] = serviceData;
+
+  try{
+    await window.storage.set('service-history', JSON.stringify(serviceHistory));
+    await window.storage.set('service-current-date', newIso);
+  }catch(e){
+    console.error('Erreur sauvegarde service', e);
+  }
+
+  if(selectedArchiveDate === oldKey) selectedArchiveDate = newIso;
+
+  renderService();
+
+  const [y, m] = newIso.split('-').map(Number);
+  calendarMonth = new Date(y, m - 1, 1);
+  renderCalendar();
+  renderArchive();
+}
+
+const MONTH_NAMES = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const WEEKDAY_NAMES = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+
+function todayKey(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function capitalize(s){
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function renderBoard(highlightId){
+  board.innerHTML = '';
+  emptyState.hidden = trips.length !== 0;
+  renderStats();
+
+  const ordered = [...trips].sort((a,b)=> (b.date||'').localeCompare(a.date||'') || b.id.localeCompare(a.id));
+  ordered.forEach(trip => board.appendChild(createTripCard(trip, board, highlightId)));
+}
+
+function createTripCard(trip, container, highlightId){
+  const card = document.createElement('div');
+  card.className = 'trip-card';
+  card.dataset.id = trip.id;
+  if(trip.id === highlightId) card.classList.add('new-entry');
+
+  card.innerHTML = `
+    <div class="trip-summary">
+      <div class="trip-main">
+        <div class="trip-eyebrow">${fmtDate(trip.date)} · <span class="train">${trip.trainNo || 'Sans n°'}</span></div>
+        <div class="trip-route">${trip.origine || '?'}<span class="arrow">→</span>${trip.destination || '?'}</div>
+      </div>
+      <div class="trip-side">
+        <div class="trip-time">${fmtTime(trip.depart)} – ${fmtTime(trip.fin)}</div>
+        <div class="chevron">›</div>
+      </div>
+    </div>
+    <div class="trip-detail"></div>
+  `;
+
+  card.querySelector('.trip-summary').addEventListener('click', () => toggleDetail(card, trip, container));
+
+  if(trip.id === highlightId){
+    card.addEventListener('animationend', () => card.classList.remove('new-entry'), {once:true});
+  }
+
+  return card;
+}
+
+/* ---------------- CALENDAR ---------------- */
+function renderCalendar(){
+  const calendarCard = document.getElementById('calendarCard');
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const first = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startOffset = (first.getDay() + 6) % 7; // lundi = 0
+  const tKey = todayKey();
+
+  let cells = '';
+  for(let i = 0; i < startOffset; i++){
+    cells += `<div class="calendar-day empty"></div>`;
+  }
+  for(let d = 1; d <= daysInMonth; d++){
+    const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasService = !!serviceHistory[key];
+    const hasTrips = trips.some(t => t.date === key);
+
+    const classes = ['calendar-day'];
+    if(key === tKey) classes.push('today');
+    if(key === selectedArchiveDate) classes.push('selected');
+
+    let dots = '';
+    if(hasService || hasTrips){
+      dots = `<div class="dots">${hasService ? '<span class="dot dot-service"></span>' : ''}${hasTrips ? '<span class="dot dot-trips"></span>' : ''}</div>`;
+    }
+    cells += `<div class="${classes.join(' ')}" data-date="${key}">${d}${dots}</div>`;
+  }
+
+  calendarCard.innerHTML = `
+    <div class="calendar-header">
+      <button type="button" id="calPrev" aria-label="Mois précédent">‹</button>
+      <div class="calendar-title">${MONTH_NAMES[month]} ${year}</div>
+      <button type="button" id="calNext" aria-label="Mois suivant">›</button>
+    </div>
+    <div class="calendar-grid">
+      ${WEEKDAY_NAMES.map(w => `<div class="calendar-weekday">${w}</div>`).join('')}
+      ${cells}
+    </div>
+  `;
+
+  calendarCard.querySelector('#calPrev').addEventListener('click', () => {
+    calendarMonth = new Date(year, month - 1, 1);
+    renderCalendar();
+  });
+  calendarCard.querySelector('#calNext').addEventListener('click', () => {
+    calendarMonth = new Date(year, month + 1, 1);
+    renderCalendar();
+  });
+  calendarCard.querySelectorAll('.calendar-day[data-date]').forEach(cell => {
+    cell.addEventListener('click', () => {
+      selectedArchiveDate = cell.dataset.date;
+      loadServiceForDate(selectedArchiveDate);
+      renderCalendar();
+      renderArchive();
+    });
+  });
+}
+
+async function loadServiceForDate(key){
+  serviceData = serviceHistory[key] || null;
+  openLegs.clear();
+  try{ await window.storage.set('service-current-date', key); }catch(e){}
+  renderService();
+  renderLegs();
+}
+
+/* ---------------- ARCHIVE ---------------- */
+function renderArchive(){
+  const archiveCard = document.getElementById('archiveCard');
+  if(!selectedArchiveDate){
+    archiveCard.hidden = true;
+    return;
+  }
+  archiveCard.hidden = false;
+
+  const [y, m, d] = selectedArchiveDate.split('-').map(Number);
+  const label = new Date(y, m - 1, d).toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  const dayTrips = trips
+    .filter(t => t.date === selectedArchiveDate)
+    .sort((a,b) => (a.depart || '').localeCompare(b.depart || ''));
+
+  let html = `<div class="archive-title">Trajets — ${capitalize(label)}</div>`;
+
+  if(dayTrips.length){
+    html += `<div class="archive-trips" id="archiveTrips"></div>`;
+  }else{
+    html += `<p class="archive-empty">Aucun trajet enregistré ce jour-là.</p>`;
+  }
+
+  archiveCard.innerHTML = html;
+
+  if(dayTrips.length){
+    const container = archiveCard.querySelector('#archiveTrips');
+    dayTrips.forEach(trip => container.appendChild(createTripCard(trip, container)));
+  }
+}
+
+async function toggleDetail(card, trip, container){
+  const isOpen = card.classList.contains('open');
+  container.querySelectorAll('.trip-card.open').forEach(c => { if(c!==card) c.classList.remove('open'); });
+
+  if(isOpen){
+    card.classList.remove('open');
+    return;
+  }
+  card.classList.add('open');
+  const detail = card.querySelector('.trip-detail');
+  detail.innerHTML = '<p class="hint">Chargement...</p>';
+
+  let photos = [];
+  if(trip.hasPhotos){
+    photos = await loadPhotos(trip.id);
+  }
+
+  detail.innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-item"><div class="label">Locomotive</div><div class="value" style="font-size:14px">${trip.loco || '—'}</div></div>
+      <div class="detail-item"><div class="label">Wagons</div><div class="value">${trip.wagons ?? '—'}</div></div>
+      <div class="detail-item"><div class="label">Longueur</div><div class="value">${trip.longueur != null ? trip.longueur + ' m' : '—'}</div></div>
+      <div class="detail-item"><div class="label">Masse</div><div class="value">${trip.masse != null ? trip.masse + ' t' : '—'}</div></div>
+    </div>
+    ${trip.observations ? `<div class="obs"><div class="label">Observations / incidents</div>${escapeHtml(trip.observations)}</div>` : ''}
+    ${photos.length ? `<div class="photos">${photos.map(p=>`<img src="${p}" alt="Photo trajet">`).join('')}</div>` : ''}
+    <button class="btn-danger" data-action="delete">Supprimer ce trajet</button>
+  `;
+
+  detail.querySelectorAll('.photos img').forEach(img => {
+    img.addEventListener('click', () => openLightbox(img.src));
+  });
+
+  detail.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if(!confirm('Supprimer ce trajet ?')) return;
+    trips = trips.filter(t => t.id !== trip.id);
+    await saveTrips();
+    if(trip.hasPhotos) await deletePhotos(trip.id);
+    renderBoard();
+    renderCalendar();
+    if(selectedArchiveDate) renderArchive();
+  });
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML.replace(/\n/g,'<br>');
+}
+
+/* ---------------- LIGHTBOX ---------------- */
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightboxImg');
+function openLightbox(src){
+  lightboxImg.src = src;
+  lightbox.classList.add('open');
+}
+lightbox.addEventListener('click', () => lightbox.classList.remove('open'));
+
+/* ---------------- MODAL FORM ---------------- */
+const modalOverlay = document.getElementById('modalOverlay');
+const tripForm = document.getElementById('tripForm');
+const newTripBtn = document.getElementById('newTripBtn');
+const cancelFormBtn = document.getElementById('cancelFormBtn');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const formHint = document.getElementById('formHint');
+
+function openModal(prefill){
+  modalOverlay.classList.add('open');
+  const dateInput = tripForm.querySelector('[name="date"]');
+  if(prefill && prefill.date){
+    dateInput.value = prefill.date;
+  }else{
+    dateInput.valueAsDate = new Date();
+  }
+  if(prefill){
+    if(prefill.trainNo) tripForm.querySelector('[name="trainNo"]').value = prefill.trainNo;
+    if(prefill.origine) tripForm.querySelector('[name="origine"]').value = prefill.origine;
+    if(prefill.destination) tripForm.querySelector('[name="destination"]').value = prefill.destination;
+    if(prefill.depart) tripForm.querySelector('[name="depart"]').value = prefill.depart;
+    if(prefill.fin) tripForm.querySelector('[name="fin"]').value = prefill.fin;
+    if(prefill.loco) tripForm.querySelector('[name="loco"]').value = prefill.loco;
+    if(prefill.wagons != null) tripForm.querySelector('[name="wagons"]').value = prefill.wagons;
+    if(prefill.longueur != null) tripForm.querySelector('[name="longueur"]').value = prefill.longueur;
+    if(prefill.masse != null) tripForm.querySelector('[name="masse"]').value = prefill.masse;
+  }
+  if(pendingPhoto){
+    formHint.textContent = '📷 Photo TC286 jointe — complétez les champs et enregistrez.';
+  }
+}
+function closeModal(){
+  modalOverlay.classList.remove('open');
+  tripForm.reset();
+  formHint.textContent = '';
+  pendingPhoto = null;
+}
+newTripBtn.addEventListener('click', openModal);
+cancelFormBtn.addEventListener('click', closeModal);
+closeModalBtn.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) closeModal(); });
+
+tripForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(tripForm);
+  const id = 'trip_' + Date.now();
+
+  const trip = {
+    id,
+    date: fd.get('date'),
+    trainNo: fd.get('trainNo').trim(),
+    loco: fd.get('loco').trim(),
+    wagons: fd.get('wagons') ? Number(fd.get('wagons')) : null,
+    longueur: fd.get('longueur') ? Number(fd.get('longueur')) : null,
+    masse: fd.get('masse') ? Number(fd.get('masse')) : null,
+    origine: fd.get('origine').trim(),
+    destination: fd.get('destination').trim(),
+    depart: fd.get('depart'),
+    fin: fd.get('fin'),
+    observations: fd.get('observations').trim(),
+    hasPhotos: false
+  };
+
+  const files = tripForm.querySelector('[name="photos"]').files;
+  const photos = [];
+  if(pendingPhoto) photos.push(pendingPhoto);
+  if(files && files.length){
+    formHint.textContent = 'Traitement des photos...';
+    for(const file of files){
+      try{
+        const dataUrl = await resizeImage(file);
+        photos.push(dataUrl);
+      }catch(err){ console.error(err); }
+    }
+  }
+  if(photos.length){
+    await savePhotos(id, photos);
+    trip.hasPhotos = true;
+  }
+  pendingPhoto = null;
+
+  trips.push(trip);
+  await saveTrips();
+
+  closeModal();
+  renderBoard(id);
+  renderCalendar();
+  if(selectedArchiveDate === trip.date) renderArchive();
+});
+
+/* ---------------- EXPORTS ---------------- */
+function tripsToRows(){
+  return [...trips]
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||''))
+    .map(t => ({
+      'Date': fmtDate(t.date),
+      'Train': t.trainNo || '',
+      'Locomotive': t.loco || '',
+      'Wagons': t.wagons ?? '',
+      'Longueur (m)': t.longueur ?? '',
+      'Masse (t)': t.masse ?? '',
+      'Origine': t.origine || '',
+      'Destination': t.destination || '',
+      'Départ': t.depart || '',
+      'Fin': t.fin || '',
+      'Observations': t.observations || ''
+    }));
+}
+
+document.getElementById('exportExcelBtn').addEventListener('click', () => {
+  if(trips.length === 0){ alert('Aucun trajet à exporter.'); return; }
+  const rows = tripsToRows();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Journal de bord');
+  XLSX.writeFile(wb, 'carnet-de-bord.xlsx');
+});
+
+document.getElementById('exportPdfBtn').addEventListener('click', () => {
+  if(trips.length === 0){ alert('Aucun trajet à exporter.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+  doc.setFontSize(14);
+  doc.text('Carnet de bord — Conducteur', 14, 14);
+
+  const rows = tripsToRows();
+  const head = [Object.keys(rows[0])];
+  const body = rows.map(r => Object.values(r));
+
+  doc.autoTable({
+    head,
+    body,
+    startY: 20,
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [11, 13, 15], textColor: [198, 224, 0] }
+  });
+
+  doc.save('carnet-de-bord.pdf');
+});
+
+/* ---------------- CAMERA TC286 ---------------- */
+const legCameraInput = document.getElementById('legCameraInput');
+legCameraInput.addEventListener('change', async () => {
+  const file = legCameraInput.files[0];
+  legCameraInput.value = '';
+  if(!file || pendingLegIndex === null) return;
+
+  try{
+    pendingPhoto = await resizeImage(file);
+  }catch(e){
+    pendingPhoto = null;
+  }
+
+  const leg = serviceData.legs[pendingLegIndex];
+  openModal({
+    trainNo: leg.trNr,
+    origine: leg.origine,
+    destination: leg.destination,
+    depart: leg.debut,
+    fin: leg.fin,
+    date: serviceDateToInputValue(serviceData.date),
+    loco: legLocoString(leg),
+    wagons: leg.wagons,
+    longueur: leg.longueur,
+    masse: leg.masse
+  });
+  pendingLegIndex = null;
+});
+
+/* ---------------- IMPORT PDF DE SERVICE ---------------- */
+// Pas de worker externe — compatible file:// et https
+pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+const importPdfBtn = document.getElementById('importPdfBtn');
+const pdfInput = document.getElementById('pdfInput');
+importPdfBtn.addEventListener('click', () => pdfInput.click());
+
+pdfInput.addEventListener('change', async () => {
+  const file = pdfInput.files[0];
+  pdfInput.value = '';
+  if(!file) return;
+
+  const originalLabel = importPdfBtn.textContent;
+  importPdfBtn.textContent = 'Analyse...';
+  try{
+    const pages = await extractPdfPages(file);
+
+    let matchedIndices = [];
+    if(pages.length > 1){
+      if(!driverName.trim()){
+        alert('Ce PDF contient plusieurs pages. Renseigne ton nom dans le champ "Conducteur" en haut de l\'app pour que ton service soit retrouvé automatiquement.');
+        importPdfBtn.textContent = originalLabel;
+        return;
+      }
+      matchedIndices = pages
+        .map((p, idx) => pageMatchesName(p.text, driverName) ? idx : -1)
+        .filter(idx => idx !== -1);
+
+      if(matchedIndices.length === 0){
+        alert(`Le nom "${driverName}" n'a pas été trouvé dans ce PDF. Vérifie l'orthographe dans le champ "Conducteur".`);
+        importPdfBtn.textContent = originalLabel;
+        return;
+      }
+    }else{
+      matchedIndices = [0];
+    }
+
+    const importedKeys = [];
+    const tKey = todayKey();
+
+    // Regroupe les pages consécutives appartenant au même service :
+    // une page de continuation (sans TrNr/Type dans le texte) est fusionnée
+    // avec la page principale qui la précède dans matchedIndices.
+    const groups = [];
+    for(const idx of matchedIndices){
+      const hasTrNr = /TrNr/.test(pages[idx].text);
+      if(!hasTrNr && groups.length > 0){
+        // Page de continuation : on l'ajoute au groupe précédent
+        groups[groups.length - 1].push(idx);
+      }else{
+        groups.push([idx]);
+      }
+    }
+
+    groups.forEach(group => {
+      const pagesGroup = group.map(i => pages[i]);
+      const parsed = parseServicePdf(pagesGroup);
+      if(!parsed) return;
+      const key = serviceDateToInputValue(parsed.date);
+      if(!key) return;
+
+      serviceHistory[key] = parsed;
+      importedKeys.push(key);
+    });
+
+    if(importedKeys.length === 0){
+      alert('Impossible de lire ce PDF automatiquement. Vérifiez le format ou complétez les champs manuellement.');
+      importPdfBtn.textContent = originalLabel;
+      return;
+    }
+
+    const primaryKey = importedKeys.includes(tKey) ? tKey : [...importedKeys].sort()[0];
+    const importedCount = importedKeys.length;
+
+    try{
+      await window.storage.set('service-history', JSON.stringify(serviceHistory));
+      await window.storage.set('service-current-date', primaryKey);
+    }catch(e){
+      console.error('Erreur sauvegarde service', e);
+    }
+
+    serviceData = serviceHistory[primaryKey];
+    openLegs.clear();
+    renderService();
+    renderLegs();
+
+    const [y, m] = primaryKey.split('-').map(Number);
+    calendarMonth = new Date(y, m - 1, 1);
+    selectedArchiveDate = primaryKey;
+    renderCalendar();
+    renderArchive();
+
+    // Génère un PDF ne contenant que les pages du conducteur
+    if(matchedIndices.length >= 1 && pages.length > 1){
+      await downloadFilteredPdf(file, matchedIndices);
+    }
+
+    if(matchedIndices.length > 1){
+      alert(`${importedCount} jour(s) de service importé(s) et ajouté(s) au calendrier.`);
+    }
+  }catch(e){
+    console.error(e);
+    alert('Erreur lors de la lecture du PDF.');
+  }
+  importPdfBtn.textContent = originalLabel;
+});
+
+async function downloadFilteredPdf(file, pageIndices){
+  try{
+    const bytes = await file.arrayBuffer();
+    const srcDoc = await PDFLib.PDFDocument.load(bytes);
+    const newDoc = await PDFLib.PDFDocument.create();
+    const copied = await newDoc.copyPages(srcDoc, pageIndices);
+    copied.forEach(p => newDoc.addPage(p));
+    const outBytes = await newDoc.save();
+
+    const blob = new Blob([outBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = (driverName || 'conducteur').trim().replace(/\s+/g, '-').toLowerCase();
+    // Nom du fichier : AAAAMMJJ si la date du service est disponible, sinon nom du conducteur
+    let pdfFileName = `service-${safeName}.pdf`;
+    if(serviceData && serviceData.date){
+      const dateKey = serviceDateToInputValue(serviceData.date); // YYYY-MM-DD
+      if(dateKey) pdfFileName = `${dateKey.replace(/-/g,'')}.pdf`;
+    }
+    a.download = pdfFileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    console.error('Erreur génération PDF filtré', e);
+  }
+}
+
+async function extractPdfPages(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const pages = [];
+  for(let i=1; i<=pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const items = content.items
+      .filter(it => it.str && it.str.trim() !== '')
+      .map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5] }));
+    const text = content.items.map(it => it.str).join(' ');
+    pages.push({ text, items });
+  }
+  return pages;
+}
+
+function normalizeStr(s){
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function pageMatchesName(pageText, name){
+  const norm = normalizeStr(pageText);
+  const parts = normalizeStr(name).split(' ').filter(Boolean);
+  return parts.length > 0 && parts.every(p => norm.includes(p));
+}
+
+/* ---------------- COLUMN-BASED LEG EXTRACTION ---------------- */
+function groupRows(items, tolerance){
+  const sorted = [...items].sort((a, b) => b.y - a.y);
+  const rows = [];
+  for(const item of sorted){
+    const row = rows[rows.length - 1];
+    if(row && Math.abs(row.y - item.y) <= tolerance){
+      row.items.push(item);
+    }else{
+      rows.push({ y: item.y, items: [item] });
+    }
+  }
+  rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
+  return rows;
+}
+
+// Détecte les positions de colonnes depuis l'en-tête. Retourne null si page de continuation.
+function findColBounds(items){
+  const rows = groupRows(items, 1.5);
+  const headerRow = rows.find(r =>
+    r.items.some(it => it.str.trim() === 'TrNr') &&
+    r.items.some(it => it.str.trim() === 'Type')
+  );
+  if(!headerRow) return null;
+  const findX = pred => { const it = headerRow.items.find(pred); return it ? it.x : null; };
+  const b = {
+    ligneX:  findX(it => it.str.trim() === 'Ligne'),
+    trNrX:   findX(it => it.str.trim() === 'TrNr'),
+    efOperX: findX(it => /^EF\.?$/.test(it.str.trim())),
+    typeX:   findX(it => it.str.trim() === 'Type'),
+    deX:     findX(it => it.str.trim() === 'De'),
+    versX:   findX(it => it.str.trim() === 'Vers'),
+    debutX:  findX(it => /^D[ée]but/.test(it.str.trim())),
+    finX:    findX(it => it.str.trim() === 'Fin'),
+  };
+  if(Object.values(b).some(v => v === null)) return null;
+  return b;
+}
+
+// Extrait les LEGs d'une page avec des bounds de colonnes connus.
+// Dictionnaire de corrections automatiques des noms de gares tronqués
+const GARE_CORRECTIONS = {
+  'TERGNIER FSC': 'TERGNIER - FSC RÉCEPTION',
+  'TERGNIER - FSC': 'TERGNIER - FSC RÉCEPTION',
+  'TERGNIER- FSC': 'TERGNIER - FSC RÉCEPTION',
+  'TERGNIER -FSC': 'TERGNIER - FSC RÉCEPTION',
+  'FSC RÉCEPTION': 'TERGNIER - FSC RÉCEPTION',
+  'FSC RECEPTION': 'TERGNIER - FSC RÉCEPTION',
+  'THIONVILLE-FAISCEAU EST': 'THIONVILLE - FAISCEAU EST',
+  'THIONVILLE-FAISCEAU': 'THIONVILLE - FAISCEAU EST',
+  'THIONVILLE FAISCEAU': 'THIONVILLE - FAISCEAU EST',
+  'LA LOUVIERE-GARE INDUSTRIELLE': 'LA LOUVIÈRE - GARE INDUSTRIELLE',
+  'LA LOUVIERE-GARE': 'LA LOUVIÈRE - GARE INDUSTRIELLE',
+  'LOUVIERE-GARE INDUSTRIELLE': 'LA LOUVIÈRE - GARE INDUSTRIELLE',
+  'QUEVY-FRONTIERE': 'QUEVY - FRONTIÈRE',
+  'ERQUELINNES-FRONTIERE': 'ERQUELINNES - FRONTIÈRE',
+  'RECEPTION ERQUELINNES-FRONTIERE': 'ERQUELINNES - FRONTIÈRE',
+  'RÉCEPTION ERQUELINNES-FRONTIERE': 'ERQUELINNES - FRONTIÈRE',
+  'MONCEAU-FORMATION': 'MONCEAU - FORMATION',
+  'MONCEAU-RECEPTION': 'MONCEAU - RÉCEPTION',
+  'CHATELET-FORMATION': 'CHÂTELET - FORMATION',
+  'GENT-ZEEHAVEN': 'GENT - ZEEHAVEN',
+  'ANTWERPEN-NOORD-BUNDEL': 'ANTWERPEN - NOORD BUNDEL',
+  'FELUY-ZONING': 'FELUY - ZONING',
+};
+
+function fixGareName(name){
+  if(!name) return name;
+  const trimmed = name.trim();
+  // Cherche une correspondance exacte ou partielle
+  for(const [wrong, correct] of Object.entries(GARE_CORRECTIONS)){
+    if(trimmed.toUpperCase() === wrong.toUpperCase()) return correct;
+    if(trimmed.toUpperCase().startsWith(wrong.toUpperCase())) return correct;
+  }
+  return trimmed;
+}
+
+function extractLegsWithBounds(items, b){
+  if(!items || !items.length || !b) return [];
+  const colNames  = ['ligne','trnr','efoper','type','de','vers','debut','fin'];
+  const boundsArr = [b.ligneX, b.trNrX, b.efOperX, b.typeX, b.deX, b.versX, b.debutX, b.finX];
+  const colOf = x => { for(let i = boundsArr.length-1; i >= 0; i--) if(x >= boundsArr[i]) return colNames[i]; return 'ligne'; };
+  const legs = [];
+  const rows = groupRows(items, 1.5);
+  rows.forEach(row => {
+    const cols = { ligne:'', trnr:'', efoper:'', type:'', de:'', vers:'', debut:'', fin:'' };
+    row.items.forEach(it => {
+      const str = it.str.trim();
+      if(!str) return;
+      const merged = str.match(/^(.*\D)(\d{2}:\d{2})$/);
+      if(merged){
+        cols.vers += (cols.vers ? ' ' : '') + merged[1];
+        if(!cols.debut) cols.debut = merged[2]; else cols.fin = merged[2];
+        return;
+      }
+      const col = colOf(it.x);
+      cols[col] += (cols[col] ? ' ' : '') + str;
+    });
+    if(cols.type.trim().toUpperCase() === 'LEG'){
+      const hlpInfo = parseHlpMarker(cols.ligne);
+      legs.push({
+        trNr: cols.trnr.replace(/\D/g, ''),
+        operateur: cols.efoper.trim().replace(/\s+/g, ' '),
+        origine: fixGareName(cols.de.trim().replace(/\s+/g, ' ')),
+        destination: fixGareName(cols.vers.trim().replace(/\s+/g, ' ')),
+        debut: cols.debut,
+        fin: cols.fin,
+        loco1:'', loco2:'',
+        hlp: hlpInfo ? true : false,
+        hlpConfig: hlpInfo ? hlpInfo.hlpConfig : null,
+        wagons: hlpInfo ? 0 : null,
+        longueur: hlpInfo ? (hlpInfo.locoCount >= 2 ? 40 : 20) : null,
+        masse: hlpInfo ? 100 : null
+      });
+    }
+  });
+  return legs;
+}
+
+// Compatibilité : extrait les LEGs d'une seule page autonome.
+function extractLegsFromItems(items){
+  const b = findColBounds(items);
+  if(!b) return null;
+  const legs = extractLegsWithBounds(items, b);
+  return legs.length ? legs : null;
+}
+
+// Marqueurs de la colonne "Ligne de loc": LE/EL = 1 locomotive seule (HLP),
+// LE+LLE / EL+ELL / LLE / ELL = 2 locomotives seules (HLP)
+function parseHlpMarker(text){
+  const m = text.match(/\b(LE\+LLE|EL\+ELL|LLE\+LE|ELL\+EL|LLE|ELL|LE|EL)\b/);
+  if(!m) return null;
+  const token = m[1];
+  const twoLoco = token.includes('+') || token.includes('LLE') || token.includes('ELL');
+  let hlpConfig;
+  if(token.includes('ELL')) hlpConfig = 'ELL';
+  else if(token.includes('LLE')) hlpConfig = 'LLE';
+  else hlpConfig = token; // 'LE' ou 'EL'
+  return { hlpConfig, locoCount: twoLoco ? 2 : 1 };
+}
+
+// parseServicePdf accepte soit une page seule, soit un tableau de pages consécutives
+// (page principale + pages de continuation sans en-tête de colonnes).
+function parseServicePdf(pageOrPages){
+  // Normalise en tableau
+  const pagesArr = Array.isArray(pageOrPages) ? pageOrPages : [pageOrPages];
+  const mainPage = pagesArr[0];
+  const text = mainPage.text;
+
+  const prestationMatch = text.match(/\b([A-Z]{3,5}-\d{2,5})\b/);
+  const dateMatch       = text.match(/(\d{2}\/\d{2}\/\d{4})/);
+  const timesMatch      = text.match(/(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})/);
+
+  if(!timesMatch) return null;
+
+  // Extraction des LEGs en propageant les bounds entre pages
+  let legs = [];
+  let lastBounds = null;
+  for(const page of pagesArr){
+    const bounds = findColBounds(page.items) || lastBounds;
+    if(bounds){
+      lastBounds = bounds;
+      const pagelegs = extractLegsWithBounds(page.items, bounds);
+      legs.push(...pagelegs);
+    }
+  }
+
+  // Repli regex si aucun LEG trouvé
+  if(legs.length === 0){
+    const legRegex = /(\d{4,6})\s+([A-Za-zÀ-ÖØ-öø-ÿ0-9()+\s]+?)\s+LEG\s+([A-ZÀ-Ö0-9\-\s]+?)(\d{2}:\d{2})\s+(\d{2}:\d{2})/g;
+    const allText = pagesArr.map(p => p.text).join(' ');
+    let m;
+    while((m = legRegex.exec(allText)) !== null){
+      const routeRaw = m[3].trim().replace(/\s+/g, ' ');
+      const words = routeRaw.split(' ');
+      const mid = Math.ceil(words.length / 2);
+      legs.push({
+        trNr: m[1], operateur: m[2].trim(),
+        origine: words.slice(0, mid).join(' '),
+        destination: words.slice(mid).join(' '),
+        debut: m[4], fin: m[5],
+        loco1:'', loco2:'', hlp:false, hlpConfig:null, wagons:null, longueur:null, masse:null
+      });
+    }
+  }
+
+  return {
+    prestation: prestationMatch ? prestationMatch[1] : '',
+    date: dateMatch ? dateMatch[1] : '',
+    duree: timesMatch[1],
+    debut: timesMatch[2],
+    fin: timesMatch[3],
+    legs
+  };
+}
+
+/* ---------------- INIT ---------------- */
+// Helper : HTML d'une service card (lecture seule, pour E500)
+function buildServiceCardHTML(s){
+  if(!s) return '<p class="service-empty">Aucun service extrait.</p>';
+  return `
+    <div class="service-top">
+      <div>
+        <div class="service-id">${s.prestation || '—'}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">${s.date || ''}</div>
+      </div>
+      <div class="service-stats">
+        <div class="service-stat"><div class="value">${s.duree || '—'}</div><div class="label">Durée</div></div>
+        <div class="service-stat"><div class="value">${s.debut || '—'} – ${s.fin || '—'}</div><div class="label">Début – Fin</div></div>
+      </div>
+    </div>`;
+}
+
+// Helper : HTML d'une leg card (lecture seule, pour E500)
+function buildLegCardHTML(leg, i){
+  const hlpBadge = leg.hlp ? `<span class="hlp-badge">${leg.hlpConfig || 'HLP'}</span>` : '';
+  return `
+    <div class="leg-card" style="margin-bottom:10px">
+      <div class="leg-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">
+        <div>
+          <span class="leg-train" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;color:var(--lime)">${leg.trNr || '—'}</span>
+          ${hlpBadge}
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${leg.operateur || ''}</div>
+        </div>
+        <div style="text-align:right;font-size:13px">
+          <div style="font-weight:600">${leg.debut || '—'} → ${leg.fin || '—'}</div>
+          <div style="color:var(--muted);font-size:12px;margin-top:2px">${leg.origine || ''} → ${leg.destination || ''}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+(async function init(){
+  await loadTrips();
+  await loadService();
+  await loadDriverName();
+
+  const driverNameInput = document.getElementById('driverName');
+  driverNameInput.value = driverName;
+  driverNameInput.addEventListener('change', (e) => saveDriverName(e.target.value.trim()));
+
+  const initialKey = (serviceData && serviceDateToInputValue(serviceData.date)) || todayKey();
+  const [iy, im] = initialKey.split('-').map(Number);
+  calendarMonth = new Date(iy, im - 1, 1);
+  selectedArchiveDate = initialKey;
+
+  // Démarrer sur la page d'accueil
+  showPage('home');
+})();
+</script>
+
+</body>
+</html>
