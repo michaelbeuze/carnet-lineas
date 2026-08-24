@@ -3029,7 +3029,7 @@ legCameraInput.addEventListener('change', async () => {
 
 /* ---------------- IMPORT PDF DE SERVICE ---------------- */
 // Pas de worker externe — compatible file:// et https
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const importPdfBtn = document.getElementById('importPdfBtn');
 const pdfInput = document.getElementById('pdfInput');

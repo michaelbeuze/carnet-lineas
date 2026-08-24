@@ -1,4 +1,4 @@
-const CACHE = 'carnet-lineas-v31';
+const CACHE = 'carnet-lineas-v46';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -10,7 +10,6 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
-  'https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap'
 ];
 
 self.addEventListener('install', e => {
@@ -30,6 +29,21 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Ajouter les headers CORS pour permettre au worker pdfjs de fonctionner
+  if(e.request.url.includes('pdf.worker')){
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if(cached){
+          const headers = new Headers(cached.headers);
+          headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+          headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+          return new Response(cached.body, { status: cached.status, headers });
+        }
+        return fetch(e.request);
+      })
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => cached))
   );
