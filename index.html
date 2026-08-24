@@ -1828,10 +1828,16 @@ function parseE500Planning(pages, driverName){
     // Format: "BEUZE [stats] MICHAËL [tok1 tok2 ... tokN] -HHH:MM"
     // On cherche entre le 2e nom et le premier grand négatif
     // 2. Trouver la séquence de tokens par position dans le texte
-    // On cherche la position du 2e nom (prénom) et on prend les tokens après
     const pos0 = pageNorm.indexOf(nameParts[0]);
     const pos1 = nameParts.length > 1 ? pageNorm.indexOf(nameParts[1], pos0) : pos0;
-    const startPos = pos1 >= 0 ? pos1 + nameParts[1].length : pos0 + nameParts[0].length;
+    let startPos = pos1 >= 0 ? pos1 + (nameParts[1] || nameParts[0]).length : pos0 + nameParts[0].length;
+
+    // Sauter le numéro de matricule et "initially planned" qui suivent le prénom
+    const afterPrenom = pageNorm.slice(startPos);
+    // Chercher le début des vrais tokens de planning (premier token connu: lh/rx/oo/856/etc.)
+    // On skip jusqu'à trouver un token qui ressemble à un code de planning
+    const skipMatch = afterPrenom.match(/\s+(?=(?:lh|elh|rx|oo|cp|ct|aba|ext|\d{3,4})\b)/i);
+    if(skipMatch) startPos += skipMatch.index + skipMatch[0].length;
 
     // Trouver le premier grand négatif après le nom (écart cumulé)
     const afterName = pageNorm.slice(startPos);
@@ -1840,8 +1846,6 @@ function parseE500Planning(pages, driverName){
     const nameSection = afterName.slice(0, endPos).trim();
     const tokenSeq = nameSection.split(/\s+/).filter(Boolean);
 
-    // DEBUG
-    alert('pos0='+pos0+' pos1='+pos1+'\nheaderDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
 
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
