@@ -1830,21 +1830,21 @@ function parseE500Planning(pages, driverName){
     // 2. Trouver la séquence de tokens par position dans le texte
     const pos0 = pageNorm.indexOf(nameParts[0]);
     const pos1 = nameParts.length > 1 ? pageNorm.indexOf(nameParts[1], pos0) : pos0;
-    let startPos = pos1 >= 0 ? pos1 + (nameParts[1] || nameParts[0]).length : pos0 + nameParts[0].length;
+    const afterPrenom = pageNorm.slice(pos1 >= 0 ? pos1 : pos0);
 
-    // Sauter le numéro de matricule et "initially planned" qui suivent le prénom
-    const afterPrenom = pageNorm.slice(startPos);
-    // Chercher le début des vrais tokens de planning (premier token connu: lh/rx/oo/856/etc.)
-    // On skip jusqu'à trouver un token qui ressemble à un code de planning
-    const skipMatch = afterPrenom.match(/\s+(?=(?:lh|elh|rx|oo|cp|ct|aba|ext|\d{3,4})\b)/i);
-    if(skipMatch) startPos += skipMatch.index + skipMatch[0].length;
+    // Trouver le premier grand négatif (écart cumulé) pour délimiter la fin
+    const negMatch = afterPrenom.match(/-\d{2,3}:\d{2}/);
+    const endPos = negMatch ? afterPrenom.indexOf(negMatch[0]) : afterPrenom.length;
+    const nameSection = afterPrenom.slice(0, endPos);
 
-    // Trouver le premier grand négatif après le nom (écart cumulé)
-    const afterName = pageNorm.slice(startPos);
-    const negMatch = afterName.match(/-\d{2,3}:\d{2}/);
-    const endPos = negMatch ? afterName.indexOf(negMatch[0]) : afterName.length;
-    const nameSection = afterName.slice(0, endPos).trim();
-    const tokenSeq = nameSection.split(/\s+/).filter(Boolean);
+    // Tokeniser et chercher le début des tokens de planning
+    // Les tokens de planning sont: lh, elh, rx, oo, cp, ct, aba, ext, ou numéros 3-4 chiffres
+    // On ignore le matricule (9 chiffres) et "initially planned"
+    const PLANNING_RE = /^(lh|elh|rx|oo|cp|ct|aba|ext|sam|dim|lun|mar|mer|jeu|ven|\d{3,4})$/i;
+    const allTokens = nameSection.trim().split(/\s+/).filter(Boolean);
+    // Trouver le premier index qui est un token de planning
+    let firstPlanIdx = allTokens.findIndex(t => PLANNING_RE.test(t));
+    const tokenSeq = firstPlanIdx >= 0 ? allTokens.slice(firstPlanIdx) : allTokens;
 
 
     // 3. Associer token[i] -> jour headerDays[i]
