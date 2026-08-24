@@ -1832,20 +1832,29 @@ function parseE500Planning(pages, driverName){
     const pos1 = nameParts.length > 1 ? pageNorm.indexOf(nameParts[1], pos0) : pos0;
     const afterPrenom = pageNorm.slice(pos1 >= 0 ? pos1 : pos0);
 
-    // Trouver le premier grand négatif (écart cumulé) pour délimiter la fin
-    const negMatch = afterPrenom.match(/-\d{2,3}:\d{2}/);
-    const endPos = negMatch ? afterPrenom.indexOf(negMatch[0]) : afterPrenom.length;
+    // Délimiter la section : jusqu'au matricule (9 chiffres) OU au grand négatif
+    const matriculeMatch = afterPrenom.match(/\b\d{9}\b/);
+    const negMatch2 = afterPrenom.match(/-\d{2,3}:\d{2}/);
+    let endPos;
+    if(matriculeMatch && negMatch2){
+      endPos = Math.min(afterPrenom.indexOf(matriculeMatch[0]), afterPrenom.indexOf(negMatch2[0]));
+    }else if(matriculeMatch){
+      endPos = afterPrenom.indexOf(matriculeMatch[0]);
+    }else if(negMatch2){
+      endPos = afterPrenom.indexOf(negMatch2[0]);
+    }else{
+      endPos = afterPrenom.length;
+    }
     const nameSection = afterPrenom.slice(0, endPos);
 
-    // Tokeniser et chercher le début des tokens de planning
-    // Les tokens de planning sont: lh, elh, rx, oo, cp, ct, aba, ext, ou numéros 3-4 chiffres
-    // On ignore le matricule (9 chiffres) et "initially planned"
-    const PLANNING_RE = /^(lh|elh|rx|oo|cp|ct|aba|ext|sam|dim|lun|mar|mer|jeu|ven|\d{3,4})$/i;
+    // Tokeniser et sauter les tokens non-planning (michael, nom, etc.)
+    const PLANNING_RE = /^(lh|elh|rx|oo|cp|ct|aba|ext|sam|dim|lun|mar|mer|jeu|ven|vede|for|forp|\d{3,4})$/i;
     const allTokens = nameSection.trim().split(/\s+/).filter(Boolean);
-    // Trouver le premier index qui est un token de planning
-    let firstPlanIdx = allTokens.findIndex(t => PLANNING_RE.test(t));
+    const firstPlanIdx = allTokens.findIndex(t => PLANNING_RE.test(t));
     const tokenSeq = firstPlanIdx >= 0 ? allTokens.slice(firstPlanIdx) : allTokens;
 
+    // DEBUG
+    alert('pos0='+pos0+' pos1='+pos1+'\nheaderDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
 
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
@@ -1868,36 +1877,52 @@ function parseE500Planning(pages, driverName){
     }
 
     // 4. Extraire les heures depuis le texte (zone après les tokens)
-    // Les heures apparaissent fragmentées — on cherche les patterns H:MM dans la section
-    // après la séquence principale et avant "Initially planned"
-    // Elles sont associées aux mêmes jours dans le même ordre
-    if(headerDays.length > 0 && tokenSeq.length > headerDays.length){
-      const afterTokens = tokenSeq.slice(headerDays.length);
-      // Chercher les patterns H:MM ou HH:MM dans les tokens restants
-      // et reconstruire les paires début/fin
-      const allTimes = [];
-      let buf = '';
-      for(const tok of afterTokens){
-        buf += tok;
-        const m = buf.match(/^(\d{1,2}:\d{2})/);
-        if(m){
-          allTimes.push(m[1]);
-          buf = buf.slice(m[1].length);
-        }else if(buf.length > 6){
-          buf = tok; // reset si trop long
+    // Extraire les heures par positions y relatives
+    // Dans le E500: service à condY, départ à condY-8.7px, fin à condY-16px
+    // On reconstruit les tokens fragmentés (ex: '1',':','4','5' -> '1:45')
+    const reconstructTimes = (targetY, tol) => {
+      const lineItems = items.filter(it => Math.abs(it.y - targetY) < tol && it.x < 650);
+      lineItems.sort((a,b) => a.x - b.x);
+      const byCol = {};
+      const colXs2 = Object.keys(dayColsX || {}).map(Number);
+      if(!colXs2.length) return {};
+      lineItems.forEach(it => {
+        const closest = colXs2.reduce((a,b) => Math.abs(b-it.x)<Math.abs(a-it.x)?b:a);
+        if(Math.abs(closest-it.x) < 15){
+          const day = dayColsX[closest];
+          if(!byCol[day]) byCol[day] = [];
+          byCol[day].push(it.str);
         }
+      });
+      const result = {};
+      for(const [day, chars] of Object.entries(byCol)){
+        const token = chars.join('');
+        const m = token.match(/(\d{1,2}:\d{2})/);
+        if(m) result[day] = m[1];
       }
+      return result;
+    };
 
-      // Associer les heures aux jours qui ont un service
-      const serviceDays = Object.keys(servicesByDay).sort();
-      let ti = 0;
-      for(const dateKey of serviceDays){
-        if(ti + 1 < allTimes.length){
-          heuresByDay[dateKey] = { debut: allTimes[ti], fin: allTimes[ti+1] };
-          ti += 2;
+    if(matchItems.length > 0 && Object.keys(dayColsX || {}).length >= 20){
+      const svcY  = matchItems[0].y - 4;   // ligne services (~4px sous michael)
+      const depY  = svcY - 8.7;             // ligne départs
+      const finY  = svcY - 16;              // ligne fins
+
+      const debuts = reconstructTimes(depY, 3);
+      const fins2  = reconstructTimes(finY, 3);
+
+      // Associer aux dates
+      const pad = n => String(n).padStart(2,'0');
+      for(const [day, debut] of Object.entries(debuts)){
+        if(!annee || !mois) continue;
+        const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
+        if(servicesByDay[dateKey]){
+          heuresByDay[dateKey] = { debut, fin: fins2[day] || null };
         }
       }
     }
+
+    // Les heures des fiches de service importées ont priorité (voir buildE500StatsHTML)
 
     // 5. Totaux heures
     const tPos0 = pageNorm.indexOf(nameParts[0]);
