@@ -4,18 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carnet de bord — Conducteur</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#000000">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Carnet Lineas">
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
-}
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1194,7 +1182,7 @@ if('serviceWorker' in navigator){
 
   <div class="home-grid">
 
-    <button class="home-tile" id="tileService" data-page="service">
+    <button class="home-tile" id="tileService" onclick="showPage('service')">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Document -->
@@ -1218,7 +1206,7 @@ if('serviceWorker' in navigator){
       <div class="home-tile-sub">Importer ma fiche PDF</div>
     </button>
 
-    <button class="home-tile" id="tileTrains" data-page="trains">
+    <button class="home-tile" id="tileTrains" onclick="showPage('trains')">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Corps loco -->
@@ -1246,7 +1234,7 @@ if('serviceWorker' in navigator){
       <div class="home-tile-sub">Enregistrer un trajet</div>
     </button>
 
-    <button class="home-tile" id="tileE500" data-page="e500">
+    <button class="home-tile" id="tileE500" onclick="showPage('e500')">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Grille calendrier -->
@@ -1273,7 +1261,7 @@ if('serviceWorker' in navigator){
       <div class="home-tile-sub">Planning série BCHA-BV</div>
     </button>
 
-    <button class="home-tile" id="tileResume" data-page="resume">
+    <button class="home-tile" id="tileResume" onclick="showPage('resume')">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="6" y="8" width="52" height="48" rx="6" fill="currentColor" opacity="0.1"/>
@@ -1464,10 +1452,6 @@ function showPage(name){
 }
 
 backBtn.addEventListener('click', () => showPage('home'));
-// Tuiles accueil
-document.querySelectorAll('[data-page]').forEach(btn => {
-  btn.addEventListener('click', () => showPage(btn.dataset.page));
-});
 
 /* ==================== RÉSUMÉ ==================== */
 let resumeMode = 'mois';   // 'mois' | 'annee'
@@ -1815,42 +1799,164 @@ function parseE500Planning(pages, driverName){
     const yearMatch = text.match(/\b(20\d{2})\b/);
     if(yearMatch) annee = parseInt(yearMatch[1]);
 
-    // Position du nom dans le texte normalisé
-    const pos0 = pageNorm.indexOf(nameParts[0]);
+    // ---- Colonnes jours depuis les items (positions x) ----
+    // Chercher la ligne avec au moins 20 chiffres distincts entre 1-31
+    const items = page.items || [];
+    const byY = {};
+    items.forEach(it => {
+      const v = parseInt(it.str);
+      if(!isNaN(v) && v >= 1 && v <= 31){
+        const yk = Math.round(it.y);
+        if(!byY[yk]) byY[yk] = [];
+        byY[yk].push({x: it.x, v});
+      }
+    });
 
-    // Section du conducteur : depuis le nom jusqu'au DEUXIÈME "initially planned"
-    // car le premier est juste après le numéro matricule, le second délimite le conducteur suivant
+    let dayColsX = {}; // x -> numéro de jour
+    let bestCount = 0;
+    for(const [yk, pairs] of Object.entries(byY)){
+      const uniq = new Set(pairs.map(p => p.v));
+      if(uniq.size > bestCount){
+        bestCount = uniq.size;
+        dayColsX = {};
+        pairs.forEach(p => { dayColsX[p.x] = p.v; });
+      }
+    }
+
+    // ---- Ligne du conducteur : trouver les items qui matchent le nom ----
+    const matchItems = items.filter(it =>
+      nameParts.some(p => normalizeStr(it.str).includes(p))
+    );
+
+    let servicesByDay = {};
+    let heuresByDay = {}; // dateKey -> {debut, fin}
+
+    if(matchItems.length > 0 && bestCount >= 20){
+      const condY = matchItems[0].y;
+      const colXs = Object.keys(dayColsX).map(Number);
+
+      // Extraire les services (numéros 800-999) ET les codes spéciaux (FOR, FORP)
+      const CODES_SPECIAUX = new Set(['FOR','FORP','FORT','FORTFOR']);
+      const extractServices = (tolY) => {
+        items.forEach(it => {
+          if(Math.abs(it.y - condY) > tolY) return;
+          const s = it.str.trim();
+          const v = parseInt(s);
+          const isService = !isNaN(v) && v >= 800 && v <= 999;
+          const isCode = CODES_SPECIAUX.has(s.toUpperCase());
+          if(!isService && !isCode) return;
+          const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
+          if(Math.abs(closest - it.x) < 15 && annee && mois){
+            const day = dayColsX[closest];
+            const pad = n => String(n).padStart(2,'0');
+            const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
+            if(isCode) servicesByDay[dateKey] = 'FOR';
+            else if(!servicesByDay[dateKey]) servicesByDay[dateKey] = String(v);
+          }
+        });
+      };
+      extractServices(8);
+      if(Object.keys(servicesByDay).length === 0) extractServices(30);
+
+      // Extraire les heures (zone sous la ligne service : condY - 8 à condY - 30)
+      // Les heures sont fragmentées en caractères, on regroupe par x proche
+      const hoursZone = items.filter(it =>
+        it.y > condY - 35 && it.y < condY - 2 && it.x < 650
+      );
+      // Regrouper par colonne (jour)
+      const byDayHours = {};
+      hoursZone.forEach(it => {
+        const closest = colXs.reduce((a, b) => Math.abs(b - it.x) < Math.abs(a - it.x) ? b : a);
+        if(Math.abs(closest - it.x) < 15){
+          const day = dayColsX[closest];
+          if(!byDayHours[day]) byDayHours[day] = [];
+          byDayHours[day].push(it);
+        }
+      });
+
+      // Pour chaque jour, reconstruire les tokens H:MM
+      const timeRe = /^\d{1,2}:\d{2}$/;
+      const cleanTime = t => {
+        // Nettoyer tokens parasites: "16:001" -> "16:00", "11:451" -> "11:45"
+        const m = t.match(/^(\d{1,2}:\d{2})\d*$/);
+        return m ? m[1] : null;
+      };
+
+      for(const [day, dayItems] of Object.entries(byDayHours)){
+        const pad = n => String(n).padStart(2,'0');
+        if(!annee || !mois) continue;
+        const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
+        // Inclure les heures pour TOUS les jours (services ET formation)
+        if(!servicesByDay[dateKey]) continue; // pas de service ni formation ce jour
+
+        // Trier par y décroissant puis x croissant
+        dayItems.sort((a,b) => b.y - a.y || a.x - b.x);
+
+        // Grouper en tokens (gap x > 8 ou gap y > 2 = nouveau token)
+        const tokens = [];
+        let cur = [];
+        for(const it of dayItems){
+          if(cur.length > 0){
+            const last = cur[cur.length-1];
+            if(it.x - last.x > 8 || Math.abs(it.y - last.y) > 2){
+              tokens.push(cur.map(i => i.str).join(''));
+              cur = [];
+            }
+          }
+          cur.push(it);
+        }
+        if(cur.length) tokens.push(cur.map(i => i.str).join(''));
+
+        // Filtrer les tokens qui ressemblent à H:MM
+        const times = tokens.map(cleanTime).filter(Boolean);
+        if(times.length >= 2){
+          heuresByDay[dateKey] = { debut: times[0], fin: times[1] };
+        }else if(times.length === 1){
+          heuresByDay[dateKey] = { debut: times[0], fin: null };
+        }
+      }
+    }
+
+    // Fallback : si pas de positions, ordre séquentiel depuis le texte
+    if(Object.keys(servicesByDay).length === 0){
+      const pos0 = pageNorm.indexOf(nameParts[0]);
+      const ip1 = pageNorm.indexOf('initially planned', pos0);
+      const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
+      const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
+      const section = pageNorm.slice(pos0, secEnd);
+      const prestNums = [...section.matchAll(/\b(\d{3,4})\b/g)]
+        .map(m => m[1]).filter(n => { const v = parseInt(n); return v >= 800 && v <= 999; });
+      const uniquePrests = [...new Set(prestNums)];
+      uniquePrests.forEach((p, i) => {
+        if(annee && mois){
+          const pad = n => String(n).padStart(2,'0');
+          servicesByDay[`${annee}-${pad(mois)}-${pad(i + 1)}`] = p;
+        }else{
+          servicesByDay[i + 1] = p;
+        }
+      });
+    }
+
+    // ---- Totaux heures ----
+    const pos0 = pageNorm.indexOf(nameParts[0]);
     const ip1 = pageNorm.indexOf('initially planned', pos0);
     const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
     const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
     const section = pageNorm.slice(pos0, secEnd);
 
-    // Prestations : numéros 3 chiffres entre 800 et 999
-    const prestNums = [...section.matchAll(/\b(\d{3,4})\b/g)]
-      .map(m => m[1])
-      .filter(n => { const v = parseInt(n); return v >= 800 && v <= 999; });
-    const uniquePrests = [...new Set(prestNums)];
-
-    // Totaux : valeurs >= 50h POSITIVES dans la section (lookbehind négatif pour exclure les -HH:MM)
-    // Structure: "494:00 ... 235:30 -258:30" — 494 = théorique, 235 = prestées
     const bigTimes = [...section.matchAll(/(?<!-)\b(\d{2,3}:\d{2})\b/g)]
       .map(m => m[1]).filter(t => parseInt(t) >= 50);
-    // Premier = théorique (494), second = prestées (235:30)
     const urTh = bigTimes.length >= 2 ? bigTimes[1] : (bigTimes[0] || null);
-
-    // Écart cumulé : valeur négative >= 50h
     const negTimes = [...section.matchAll(/-(\d{2,3}:\d{2})/g)]
       .map(m => '-' + m[1]).filter(t => parseInt(t.slice(1)) >= 50);
     const urWe = negTimes[0] || null;
 
-    const servicesByDay = {};
-    uniquePrests.forEach((p, i) => { servicesByDay[i + 1] = p; });
-
     return {
       mois, annee,
       moisLabel: mois ? `${moisNoms[mois]} ${annee || ''}` : (annee ? String(annee) : ''),
-      nbServices: uniquePrests.length,
+      nbServices: Object.keys(servicesByDay).length,
       schedule: servicesByDay,
+      heures: heuresByDay,
       urTh,
       urWe
     };
@@ -1862,20 +1968,52 @@ function parseE500Planning(pages, driverName){
 function buildE500StatsHTML(s){
   const moisNoms = ['','Janvier','Février','Mars','Avril','Mai','Juin',
                     'Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const moisCourts = ['','jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
   const label = s.moisLabel || 'Planning';
 
-  // Construire la liste des jours travaillés
-  const jours = Object.entries(s.schedule).sort((a,b) => a[0]-b[0]);
+  // Tableau 4 colonnes : Date | Service | Début/Fin | N°
+  // Exclure FOR du comptage (formation ≠ service)
+  const jours = Object.entries(s.schedule)
+    .filter(([,v]) => /^\d{3,}$/.test(v) || v === 'FOR')
+    .sort((a,b) => String(a[0]).localeCompare(String(b[0])));
+
+  let serviceCount = 0;
   const joursHTML = jours.map(([d, v]) => {
-    const isService = /^\d{3,}$/.test(v);
-    return `<div class="resume-row">
-      <div>
-        <div class="resume-row-label">Jour ${d}</div>
-      </div>
-      <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;color:${isService ? 'var(--lime)' : 'var(--muted)'}">
-        ${v}
-      </div>
-    </div>`;
+    const isFormation = v === 'FOR';
+    const isRealService = /^\d{3,}$/.test(v);
+    serviceCount++; // compter services ET formations
+
+    let dateLabel = d;
+    let dateKey = null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)){
+      const [y, m, day] = d.split('-').map(Number);
+      const jours_semaine = ['dim','lun','mar','mer','jeu','ven','sam'];
+      const dt = new Date(y, m-1, day);
+      dateLabel = `${jours_semaine[dt.getDay()]} ${String(day).padStart(2,'0')} ${moisCourts[m]}`;
+      dateKey = d;
+    }
+
+    const svc = dateKey && serviceHistory[dateKey];
+    let heures = '— / —';
+    if(svc && svc.debut){
+      heures = `${svc.debut} / ${svc.fin || '—'}`;
+    }else if(s.heures && s.heures[dateKey]){
+      const h = s.heures[dateKey];
+      heures = `${h.debut || '—'} / ${h.fin || '—'}`;
+    }
+
+    const serviceLabel = isFormation
+      ? `<span style="color:var(--muted);font-size:12px">Formation</span>`
+      : `<span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:var(--lime)">${v}</span>`;
+    const nLabel = serviceCount;
+
+    return `
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:9px 8px;font-size:13px;color:var(--text);white-space:nowrap">${dateLabel}</td>
+        <td style="padding:9px 8px">${serviceLabel}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${heures}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--muted);text-align:right">${nLabel}</td>
+      </tr>`;
   }).join('');
 
   return `
@@ -1896,9 +2034,21 @@ function buildE500StatsHTML(s){
         </div>
       </div>
     </div>
-    <div class="resume-list" style="grid-column:1/-1;padding:0;margin-top:8px">
+    <div style="grid-column:1/-1;margin-top:8px">
       <p class="section-label" style="margin:0 0 8px">Planning du mois</p>
-      ${joursHTML}
+      <table style="width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden">
+        <thead>
+          <tr style="background:var(--bg)">
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">DATE</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">SERVICE</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:left;font-weight:600">DÉBUT / FIN</th>
+            <th style="padding:8px 8px;font-size:11px;color:var(--muted);text-align:right;font-weight:600">N°</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${joursHTML}
+        </tbody>
+      </table>
     </div>
   `;
 }
