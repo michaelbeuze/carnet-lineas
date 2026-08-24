@@ -1819,6 +1819,9 @@ function parseE500Planning(pages, driverName){
     const nameMatch = pageNorm.match(nameRe);
     const tokenSeq = nameMatch ? nameMatch[1].trim().split(/\s+/) : [];
 
+    // DEBUG temporaire
+    alert('headerDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
+
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
     const heuresByDay   = {};
