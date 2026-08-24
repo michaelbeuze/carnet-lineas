@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carnet de bord — Conducteur</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carnet Lineas">
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1182,7 +1194,7 @@
 
   <div class="home-grid">
 
-    <button class="home-tile" id="tileService" onclick="showPage('service')">
+    <button class="home-tile" id="tileService" data-page="service">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Document -->
@@ -1206,7 +1218,7 @@
       <div class="home-tile-sub">Importer ma fiche PDF</div>
     </button>
 
-    <button class="home-tile" id="tileTrains" onclick="showPage('trains')">
+    <button class="home-tile" id="tileTrains" data-page="trains">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Corps loco -->
@@ -1234,7 +1246,7 @@
       <div class="home-tile-sub">Enregistrer un trajet</div>
     </button>
 
-    <button class="home-tile" id="tileE500" onclick="showPage('e500')">
+    <button class="home-tile" id="tileE500" data-page="e500">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <!-- Grille calendrier -->
@@ -1261,7 +1273,7 @@
       <div class="home-tile-sub">Planning série BCHA-BV</div>
     </button>
 
-    <button class="home-tile" id="tileResume" onclick="showPage('resume')">
+    <button class="home-tile" id="tileResume" data-page="resume">
       <div class="home-tile-icon">
         <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="6" y="8" width="52" height="48" rx="6" fill="currentColor" opacity="0.1"/>
@@ -1452,6 +1464,9 @@ function showPage(name){
 }
 
 backBtn.addEventListener('click', () => showPage('home'));
+document.querySelectorAll('[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => showPage(btn.dataset.page));
+});
 
 /* ==================== RÉSUMÉ ==================== */
 let resumeMode = 'mois';   // 'mois' | 'annee'
@@ -1812,15 +1827,21 @@ function parseE500Planning(pages, driverName){
     // 2. Trouver la séquence de tokens de la ligne du conducteur
     // Format: "BEUZE [stats] MICHAËL [tok1 tok2 ... tokN] -HHH:MM"
     // On cherche entre le 2e nom et le premier grand négatif
-    const nameRe = new RegExp(
-      nameParts[0] + '[\\s\\S]{1,200}' + (nameParts[1] || nameParts[0]) + '\\s+([\\s\\S]+?)(?=-\\d{2,3}:\\d{2})',
-      'i'
-    );
-    const nameMatch = pageNorm.match(nameRe);
-    const tokenSeq = nameMatch ? nameMatch[1].trim().split(/\s+/) : [];
+    // 2. Trouver la séquence de tokens par position dans le texte
+    // On cherche la position du 2e nom (prénom) et on prend les tokens après
+    const pos0 = pageNorm.indexOf(nameParts[0]);
+    const pos1 = nameParts.length > 1 ? pageNorm.indexOf(nameParts[1], pos0) : pos0;
+    const startPos = pos1 >= 0 ? pos1 + nameParts[1].length : pos0 + nameParts[0].length;
 
-    // DEBUG temporaire
-    alert('headerDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
+    // Trouver le premier grand négatif après le nom (écart cumulé)
+    const afterName = pageNorm.slice(startPos);
+    const negMatch = afterName.match(/-\d{2,3}:\d{2}/);
+    const endPos = negMatch ? afterName.indexOf(negMatch[0]) : afterName.length;
+    const nameSection = afterName.slice(0, endPos).trim();
+    const tokenSeq = nameSection.split(/\s+/).filter(Boolean);
+
+    // DEBUG
+    alert('pos0='+pos0+' pos1='+pos1+'\nheaderDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
 
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
@@ -1875,11 +1896,11 @@ function parseE500Planning(pages, driverName){
     }
 
     // 5. Totaux heures
-    const pos0 = pageNorm.indexOf(nameParts[0]);
-    const ip1 = pageNorm.indexOf('initially planned', pos0);
-    const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
-    const secEnd = ip2 > 0 ? ip2 : (ip1 > 0 ? ip1 + 200 : pos0 + 1000);
-    const section = pageNorm.slice(pos0, secEnd);
+    const tPos0 = pageNorm.indexOf(nameParts[0]);
+    const tIp1 = pageNorm.indexOf('initially planned', tPos0);
+    const tIp2 = tIp1 >= 0 ? pageNorm.indexOf('initially planned', tIp1 + 18) : -1;
+    const tSecEnd = tIp2 > 0 ? tIp2 : (tIp1 > 0 ? tIp1 + 200 : tPos0 + 1000);
+    const section = pageNorm.slice(tPos0, tSecEnd);
 
     const bigTimes = [...section.matchAll(/(?<!-)\b(\d{2,3}:\d{2})\b/g)]
       .map(m => m[1]).filter(t => parseInt(t) >= 50);
