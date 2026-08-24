@@ -1832,6 +1832,9 @@ function parseE500Planning(pages, driverName){
     let heuresByDay = {}; // dateKey -> {debut, fin}
 
     if(matchItems.length > 0 && bestCount >= 20){
+      console.log('[E500] bestCount='+bestCount+' matchY='+matchItems[0].y);
+      console.log('[E500] dayColsX sample:', JSON.stringify(Object.entries(dayColsX).slice(0,5)));
+      console.log('[E500] items near condY:', JSON.stringify(items.filter(it => Math.abs(it.y-matchItems[0].y)<10 && it.x < 650).slice(0,10)));
       const condY = matchItems[0].y;
       const colXs = Object.keys(dayColsX).map(Number);
 
@@ -1919,6 +1922,7 @@ function parseE500Planning(pages, driverName){
 
     // Fallback : si pas de positions, ordre séquentiel depuis le texte
     if(Object.keys(servicesByDay).length === 0){
+      console.log('[E500 FALLBACK] bestCount='+bestCount+' matchItems='+matchItems.length);
       const pos0 = pageNorm.indexOf(nameParts[0]);
       const ip1 = pageNorm.indexOf('initially planned', pos0);
       const ip2 = ip1 >= 0 ? pageNorm.indexOf('initially planned', ip1 + 18) : -1;
