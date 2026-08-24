@@ -1846,15 +1846,27 @@ function parseE500Planning(pages, driverName){
       endPos = afterPrenom.length;
     }
     const nameSection = afterPrenom.slice(0, endPos);
+    const allTokensRaw = nameSection.trim().split(/\s+/).filter(Boolean);
 
-    // Tokeniser et sauter les tokens non-planning (michael, nom, etc.)
+    // Si la section avant le matricule est trop courte (<5 tokens),
+    // prendre les tokens APRÈS le matricule jusqu'au prochain négatif
+    let tokenSeq;
     const PLANNING_RE = /^(lh|elh|rx|oo|cp|ct|aba|ext|sam|dim|lun|mar|mer|jeu|ven|vede|for|forp|\d{3,4})$/i;
-    const allTokens = nameSection.trim().split(/\s+/).filter(Boolean);
-    const firstPlanIdx = allTokens.findIndex(t => PLANNING_RE.test(t));
-    const tokenSeq = firstPlanIdx >= 0 ? allTokens.slice(firstPlanIdx) : allTokens;
+    const firstPlanIdx = allTokensRaw.findIndex(t => PLANNING_RE.test(t));
 
-    // DEBUG
-    alert('pos0='+pos0+' pos1='+pos1+'\nheaderDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
+    if(firstPlanIdx >= 0 && allTokensRaw.length - firstPlanIdx >= 5){
+      tokenSeq = allTokensRaw.slice(firstPlanIdx);
+    }else if(matriculeMatch){
+      // Chercher après le matricule
+      const afterMat = afterPrenom.slice(afterPrenom.indexOf(matriculeMatch[0]) + matriculeMatch[0].length);
+      const negAfterMat = afterMat.match(/-\d{2,3}:\d{2}/);
+      const endAfterMat = negAfterMat ? afterMat.indexOf(negAfterMat[0]) : afterMat.length;
+      const sectionAfterMat = afterMat.slice(0, endAfterMat).trim().split(/\s+/).filter(Boolean);
+      const firstPlanAfterMat = sectionAfterMat.findIndex(t => PLANNING_RE.test(t));
+      tokenSeq = firstPlanAfterMat >= 0 ? sectionAfterMat.slice(firstPlanAfterMat) : sectionAfterMat;
+    }else{
+      tokenSeq = allTokensRaw.slice(Math.max(0, firstPlanIdx));
+    }
 
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
@@ -1877,52 +1889,7 @@ function parseE500Planning(pages, driverName){
     }
 
     // 4. Extraire les heures depuis le texte (zone après les tokens)
-    // Extraire les heures par positions y relatives
-    // Dans le E500: service à condY, départ à condY-8.7px, fin à condY-16px
-    // On reconstruit les tokens fragmentés (ex: '1',':','4','5' -> '1:45')
-    const reconstructTimes = (targetY, tol) => {
-      const lineItems = items.filter(it => Math.abs(it.y - targetY) < tol && it.x < 650);
-      lineItems.sort((a,b) => a.x - b.x);
-      const byCol = {};
-      const colXs2 = Object.keys(dayColsX || {}).map(Number);
-      if(!colXs2.length) return {};
-      lineItems.forEach(it => {
-        const closest = colXs2.reduce((a,b) => Math.abs(b-it.x)<Math.abs(a-it.x)?b:a);
-        if(Math.abs(closest-it.x) < 15){
-          const day = dayColsX[closest];
-          if(!byCol[day]) byCol[day] = [];
-          byCol[day].push(it.str);
-        }
-      });
-      const result = {};
-      for(const [day, chars] of Object.entries(byCol)){
-        const token = chars.join('');
-        const m = token.match(/(\d{1,2}:\d{2})/);
-        if(m) result[day] = m[1];
-      }
-      return result;
-    };
-
-    if(matchItems.length > 0 && Object.keys(dayColsX || {}).length >= 20){
-      const svcY  = matchItems[0].y - 4;   // ligne services (~4px sous michael)
-      const depY  = svcY - 8.7;             // ligne départs
-      const finY  = svcY - 16;              // ligne fins
-
-      const debuts = reconstructTimes(depY, 3);
-      const fins2  = reconstructTimes(finY, 3);
-
-      // Associer aux dates
-      const pad = n => String(n).padStart(2,'0');
-      for(const [day, debut] of Object.entries(debuts)){
-        if(!annee || !mois) continue;
-        const dateKey = `${annee}-${pad(mois)}-${pad(day)}`;
-        if(servicesByDay[dateKey]){
-          heuresByDay[dateKey] = { debut, fin: fins2[day] || null };
-        }
-      }
-    }
-
-    // Les heures des fiches de service importées ont priorité (voir buildE500StatsHTML)
+    // Les heures viennent des fiches de service importées (serviceHistory)
 
     // 5. Totaux heures
     const tPos0 = pageNorm.indexOf(nameParts[0]);
