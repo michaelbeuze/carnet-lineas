@@ -357,6 +357,9 @@ if('serviceWorker' in navigator){
     accent-color:var(--lime);
     flex-shrink:0;
   }
+  .ops-km{margin-top:4px;font-size:13px;color:var(--lime)}
+  .ops-row.ops-train .ops-km, .ops-row.ops-train .ops-kvb, .ops-row.ops-train .ops-kvb b{color:#0A0C0E}
+  .ops-row.ops-train .ops-kvb .kvb-err{color:#7a1d00}
   .ops-kvb{margin-top:4px;font-size:13px;color:var(--lime)}
   .ops-kvb .kvb-err,.kvb-err{color:#ff9a6b;font-size:12px}
   .kvb-scroll{ max-height:340px; overflow:auto; border:1px solid #444; border-radius:8px; margin:8px 0 4px; -webkit-overflow-scrolling:touch; }
@@ -370,6 +373,10 @@ if('serviceWorker' in navigator){
   .kvb-full thead th.hlc{ background:var(--lime); color:#000; }
   .kvb-full td.pick{ background:var(--lime); color:#000; font-weight:800; outline:3px solid #fff; outline-offset:-3px; border-radius:50%/40%; }
   .kvb-legend{ font-size:11px; color:var(--muted); }
+  .km-row{ display:flex; align-items:center; gap:8px; margin:8px 0; }
+  .km-lab{ flex:1; min-width:0; font-size:13px; }
+  .km-row input{ width:84px; background:#0E1215; border:1px solid #2F373C; border-radius:10px; color:var(--text); font-size:16px; padding:8px; }
+  .km-del{ background:transparent; border:1px solid #3A4348; color:var(--text); border-radius:10px; width:38px; height:38px; }
   .kvb-ver{margin-top:8px;font-size:13px;line-height:1.5}
   .kvb-tab{border-collapse:collapse;margin:6px 0;font-size:12px;width:100%}
   .kvb-tab th,.kvb-tab td{border:1px solid #444;padding:4px 3px;text-align:center}
@@ -1270,6 +1277,7 @@ if('serviceWorker' in navigator){
   .service-top{ background:transparent; border:0; box-shadow:none; }
   .import-hero{ margin:16px; padding:18px 16px; }
   .import-hero[hidden]{ display:none; }
+  #pageService.only-import main > *:not(.import-hero){ display:none !important; }
   .home-tile:hover{ border-color:var(--lime); transform:none; }
   .home-tile:nth-child(n){ background:var(--card); }
   .home-tile-icon{ color:var(--lime); }
@@ -1433,6 +1441,11 @@ if('serviceWorker' in navigator){
 
 <!-- ==================== PAGE PARAMÈTRES ==================== -->
 <div id="pageSettings" hidden>
+  <div class="settings-card">
+    <div class="settings-title">Distances des trajets</div>
+    <div class="settings-sub">Base qui se remplit au fil des trains : chaque km saisi dans une fiche train est retenu pour ce trajet (origine → destination). Tu peux les corriger ou les supprimer ici.</div>
+    <div id="kmList"></div>
+  </div>
   <div class="profile-card">
     <label for="driverName">Mon nom (une seule fois)</label>
     <input type="text" id="driverName" placeholder="Nom Prénom (ex. Beuze Michael)" autocomplete="name">
@@ -1633,7 +1646,7 @@ if('serviceWorker' in navigator){
   <main>
     <div class="import-hero">
       <div class="import-hero-icon">📄</div>
-      <h2 class="import-hero-title">Importer ma fiche de service</h2>
+      <h2 class="import-hero-title">Introduire le service</h2>
       <p class="import-hero-desc">Importe ton PDF personnel (ex. BCHA-868). Les trains seront extraits automatiquement et ajoutés à ton calendrier.</p>
       <button class="btn-primary import-hero-btn" id="importPdfBtn">
         Choisir un PDF
@@ -1742,7 +1755,7 @@ function showPage(name, opts){
   pageSubtitle.textContent = PAGE_TITLES[name] || 'Carnet de bord';
   if(name === 'trains'){ renderBoard(); renderCalendar(); }
   if(name === 'home'){ renderHomeCalendar(); }
-  if(name === 'service'){ const hero = document.querySelector('#pageService .import-hero'); if(hero) hero.hidden = !!opts.keep; if(!opts.keep) pickCurrentService(); renderService(); renderLegs(); showServiceActions(); }
+  if(name === 'service'){ const hero = document.querySelector('#pageService .import-hero'); if(hero) hero.hidden = !!opts.keep; PAGES.service.classList.toggle('only-import', !opts.keep); if(!opts.keep) pickCurrentService(); renderService(); renderLegs(); showServiceActions(); }
   if(name === 'resume'){ renderResume(); }
   if(name === 'settings'){ renderSettings(); }
   window.scrollTo(0,0);
@@ -1813,13 +1826,15 @@ function renderResume(){
   let serviceMinutes = 0;
   let nbServices = 0;
   const serviceDetails = [];
+  let totalKm = 0;
   for(const [key, svc] of Object.entries(serviceHistory)){
     if(!key.startsWith(prefix)) continue;
+    try{ totalKm += serviceKm(svc); }catch(e){}
     if(!svc || !svc.duree) continue;
     const [h, m] = svc.duree.split(':').map(Number);
     serviceMinutes += h * 60 + m;
     nbServices++;
-    serviceDetails.push({ key, duree: svc.duree, prestation: svc.prestation || '—' });
+    serviceDetails.push({ key, duree: svc.duree, prestation: svc.prestation || '—', km: (()=>{ try{ return serviceKm(svc); }catch(e){ return 0; } })() });
   }
 
   // 2. Depuis les trajets (heure départ → heure fin)
@@ -1864,6 +1879,10 @@ function renderResume(){
       <div class="kpi-value">${longueur % 1 === 0 ? longueur : longueur.toFixed(0)} m</div>
       <div class="kpi-label">Longueur cumulée</div>
     </div>
+    <div class="resume-kpi" style="grid-column:1/-1;border-color:var(--lime)">
+      <div class="kpi-value">${totalKm > 0 ? fmtKm(totalKm) : '—'}</div>
+      <div class="kpi-label">Km parcourus (trains dont la distance est connue)</div>
+    </div>
   `;
 
   // ---- Section heures prestées ----
@@ -1889,7 +1908,7 @@ function renderResume(){
       <div class="resume-row resume-tap" data-svc="${s.key}">
         <div>
           <div class="resume-row-label">${s.prestation} ›</div>
-          <div class="resume-row-sub">${s.key}</div>
+          <div class="resume-row-sub">${s.key}${s.km>0?' · '+fmtKm(s.km):''}</div>
         </div>
         <div class="resume-row-count" style="font-size:16px">${s.duree}</div>
       </div>`).join('') : ''}
@@ -2717,6 +2736,34 @@ function diffMin(planned, real){
 function fmtDiff(d){ return d===null ? '' : (d>0 ? `+${d} min` : d<0 ? `${d} min` : 'à l\'heure'); }
 function nowHHMM(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 
+/* ---------------- KILOMÈTRES (France) ---------------- */
+// Distances déduites des PK de l'artefact « Fiches de ligne » : frontière → Tergnier
+//   via Erquelinnes / Jeumont : 239,6 − 130,878 = 108,7 km ; via Quévy / Feignies / Hautmont : 233,1 − 130,878 = 102,2 km
+const KM_SEED = { jeumont:108.7, quevy:102.2 };
+let kmMemory = {};
+(async()=>{ try{ const r = await window.storage.get('km-table'); if(r && r.value) kmMemory = JSON.parse(r.value) || {}; }catch(e){} })();
+function kmKey(a, b){ const n = x => String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,''); return n(a) + '>' + n(b); }
+function fmtKm(x){ return (Math.round(x*10)/10).toFixed(1).replace('.', ',') + ' km'; }
+function trainKmAuto(legs, fi, li){
+  const f = legs[fi], l = legs[li]; if(!f || !l) return null;
+  const m = kmMemory[kmKey(f.origine, l.destination)]; if(m && typeof m === 'object' && typeof m.km === 'number') return m.km; if(typeof m === 'number') return m;
+  const o = f.origine || '', d = l.destination || '';
+  const be = /CHATELET|MONCEAU|LOUVIERE|CHARLEROI|ANVERS|ANTWERP|GENT|GAND|QUEVY|ERQUELINNES|MONS|NAMUR/i;
+  if((/TERGNIER/i.test(d) && !/TERGNIER/i.test(o) && be.test(o)) || (/TERGNIER/i.test(o) && !/TERGNIER/i.test(d) && be.test(d)))
+    return legs.slice(fi, li + 1).some(g => /QUEVY/i.test((g.origine||'') + ' ' + (g.destination||''))) ? KM_SEED.quevy : KM_SEED.jeumont;
+  return null;
+}
+function trainKm(legs, fi, li){ const f = legs[fi]; if(f && typeof f.km === 'number') return f.km; return trainKmAuto(legs, fi, li); }
+function serviceKm(svc){
+  const legs = (svc && svc.legs) || []; let tot = 0, i = 0;
+  while(i < legs.length){
+    let j = i; while(j + 1 < legs.length && legs[i].trNr && legs[j+1].trNr === legs[i].trNr) j++;
+    const k = trainKm(legs, i, j); if(typeof k === 'number') tot += k;
+    i = j + 1;
+  }
+  return tot;
+}
+
 /* ---------------- KVB (C20.11 MA / C20.12 HLP) ---------------- */
 const KVB_MA_DECEL = ['045','047','050','054','060','068','079','096'];
 const KVB_ME_DECEL = {ME140:['079','081','083','086','088','091','093','096'], ME120:['067','070','074','077','082','086','090','096'], ME100:['057','061','065','069','074','080','087','096']};
@@ -2796,7 +2843,7 @@ function buildOpsHTML(s){
       <div class="ops-time">${o.debut||'—'}<br><span>${o.fin||''}</span></div>
       <div class="ops-main">${isNow?`<span class="now-badge">● ${nowLabel}</span> `:''}<b>${o.icon} ${escapeHtml(o.label)}${o.trNr?' '+escapeHtml(o.trNr):''}</b>${o.dur!=null && o.dur>0?` <span class="ops-dur">${fmt(o.dur)}</span>`:''}
         ${where?`<div class="ops-route">${escapeHtml(where)}</div>`:''}
-        ${o.note?`<div class="ops-route">👤 ${escapeHtml(o.note)}</div>`:''}${isTrain?(()=>{const kv=kvbCalc(s.legs[o.legIdxs[0]]);return kv?`<div class="ops-kvb">${kv.err?'KVB ':''}${kv.err?'<span class="kvb-err">'+escapeHtml(kv.err)+'</span>':'<b>'+escapeHtml(kv.txt)+'</b>'}</div>`:'';})():''}${reel}</div>
+        ${o.note?`<div class="ops-route">👤 ${escapeHtml(o.note)}</div>`:''}${isTrain?(()=>{const kmv=trainKm(s.legs,o.legIdxs[0],o.legIdxs[o.legIdxs.length-1]);return typeof kmv==='number'?`<div class="ops-km">📏 ${fmtKm(kmv)}</div>`:'';})():''}${isTrain?(()=>{const kv=kvbCalc(s.legs[o.legIdxs[0]]);return kv?`<div class="ops-kvb">${kv.err?'KVB ':''}${kv.err?'<span class="kvb-err">'+escapeHtml(kv.err)+'</span>':'<b>'+escapeHtml(kv.txt)+'</b>'}</div>`:'';})():''}${reel}</div>
       ${attr?'<div class="ops-chev">›</div>':''}
     </div>`; }).join('');
   return `<div class="ops-box">
@@ -2867,6 +2914,7 @@ function openTrainSheet(fi, li){
           <div class="field-mini"><label>Masse (t)</label><input type="number" inputmode="decimal" step="0.1" data-f="masse" value="${f.masse ?? ''}"></div>
           <div class="field-mini"><label>Masse freinée (t)</label><input type="number" inputmode="decimal" step="0.1" data-f="masseFreinee" value="${f.masseFreinee ?? ''}"></div>
           <div class="field-mini"><label>% de frein ${(f.masse&&f.masseFreinee&&f.pctFrein==null)?'(calculé)':''}</label><input type="number" inputmode="numeric" data-f="pctFrein" value="${pct}"></div>
+          <div class="field-mini"><label>Km parcourus ${(typeof f.km!=='number' && trainKmAuto(legs,fi,li)!=null)?'(auto)':''}</label><input type="number" inputmode="decimal" step="0.1" data-f="km" value="${(()=>{const k=trainKm(legs,fi,li);return k==null?'':k;})()}"></div>
           <div class="field-mini"><label>Locos remorquées (véhicules)</label><input type="number" inputmode="numeric" data-f="nbLocosRemorquees" value="${f.nbLocosRemorquees ?? ''}"></div>
           <div class="field-mini"><label>Masse nécessaire (t)</label><input type="number" inputmode="decimal" data-f="masseNecessaire" value="${f.masseNecessaire ?? ''}"></div>
           <div class="field-mini"><label>% nécessaire</label><input type="number" inputmode="numeric" data-f="pctNecessaire" value="${f.pctNecessaire ?? ''}"></div>
@@ -2895,8 +2943,14 @@ function openTrainSheet(fi, li){
     inp.addEventListener('change', () => {
       const k = inp.dataset.f;
       if(inp.type === 'checkbox'){ f.hlp = inp.checked; if(inp.checked) applyHlp(f); saveService(); openTrainSheet(fi, li); return; }
-      const numeric = ['wagons','longueur','masse','masseFreinee','pctFrein','nbLocos','nbLocosRemorquees','masseNecessaire','pctNecessaire'];
+      const numeric = ['km','wagons','longueur','masse','masseFreinee','pctFrein','nbLocos','nbLocosRemorquees','masseNecessaire','pctNecessaire'];
       f[k] = numeric.includes(k) ? (inp.value==='' ? null : Number(inp.value)) : inp.value.trim();
+      if(k==='km'){
+        const key = kmKey(f.origine, l.destination);
+        if(typeof f.km === 'number'){ kmMemory[key] = { km:f.km, o:f.origine||'', d:l.destination||'' }; } else { delete kmMemory[key]; }
+        try{ window.storage.set('km-table', JSON.stringify(kmMemory)); }catch(e){}
+        saveService(); openTrainSheet(fi, li); return;
+      }
       if(k==='kvbCat' || k==='longueur'){ saveService(); openTrainSheet(fi, li); return; }
       if(k==='masse' || k==='masseFreinee'){
         if(f.masse && f.masseFreinee) f.pctFrein = Math.round(f.masseFreinee / f.masse * 100);
@@ -3779,6 +3833,7 @@ pdfInput.addEventListener('change', async () => {
 
     const nOps = (serviceData.ops || []).length;
     importStatus(`✅ ${importedCount} service(s) importé(s) : ${importedKeys.join(', ')} — ${pages.length} pages lues, ${matchedIndices.length} à ton nom, ${nOps} opérations, ${(serviceData.legs||[]).length} train(s).`, true);
+    try{ showPage('service', { keep:true }); showSaveToast(`✅ ${importedCount} service(s) importé(s)`); }catch(e){}
   }catch(e){
     console.error(e);
     importStatus('Erreur lors de la lecture du PDF : ' + (e && e.message ? e.message : e));
@@ -4206,7 +4261,22 @@ async function savePdfFile(bytes, name, fromGesture){
 function applyBg(v){ document.documentElement.classList.toggle('bg-rothko', v==='rothko'); document.querySelectorAll('input[name="bgtheme"]').forEach(r=>{ r.checked = (r.value===v); }); }
 (async function(){ let v='cockpit'; try{ const r = await window.storage.get('bg-theme'); if(r && r.value) v=r.value; }catch(e){} applyBg(v); })();
 document.querySelectorAll('input[name="bgtheme"]').forEach(r => r.addEventListener('change', async () => { applyBg(r.value); try{ await window.storage.set('bg-theme', r.value); }catch(e){} }));
+
+function renderKmList(){
+  const box = document.getElementById('kmList'); if(!box) return;
+  const ents = Object.entries(kmMemory).map(([k,v]) => [k, (v && typeof v === 'object') ? v : { km:Number(v), o:k.split('>')[0], d:k.split('>')[1] }]);
+  if(!ents.length){ box.innerHTML = '<div class="settings-sub">Aucune distance enregistrée pour l\'instant.</div>'; return; }
+  ents.sort((a,b) => (a[1].o+a[1].d).localeCompare(b[1].o+b[1].d));
+  box.innerHTML = ents.map(([k,v]) => `<div class="km-row"><div class="km-lab">${escapeHtml(v.o)} → ${escapeHtml(v.d)}</div><input type="number" step="0.1" inputmode="decimal" data-kmk="${escapeHtml(k)}" value="${v.km}"><button type="button" class="km-del" data-kmd="${escapeHtml(k)}" aria-label="Supprimer">✕</button></div>`).join('');
+  const save = () => { try{ window.storage.set('km-table', JSON.stringify(kmMemory)); }catch(e){} };
+  box.querySelectorAll('[data-kmk]').forEach(i => i.addEventListener('change', () => {
+    const e = kmMemory[i.dataset.kmk]; const val = Number(i.value);
+    if(e && isFinite(val)){ kmMemory[i.dataset.kmk] = { ...(typeof e === 'object' ? e : {o:'',d:''}), km: val }; save(); }
+  }));
+  box.querySelectorAll('[data-kmd]').forEach(b => b.addEventListener('click', () => { delete kmMemory[b.dataset.kmd]; save(); renderKmList(); }));
+}
 function renderSettings(){
+  renderKmList();
   document.querySelectorAll('input[name="pdfmode"]').forEach(r => { r.checked = (r.value === PDFSAVE.mode); });
   const nameEl = document.getElementById('setFolderName');
   nameEl.textContent = PDFSAVE.handle ? (PDFSAVE.handle.name || 'Dossier choisi') : 'Aucun';
