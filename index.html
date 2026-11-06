@@ -2019,6 +2019,8 @@ e500Input.addEventListener('change', async () => {
         return;
       }
       e500Work.innerHTML = buildE500StatsHTML(stats);
+      { const pref = stats.annee && stats.mois ? `${stats.annee}-${String(stats.mois).padStart(2,'0')}-` : null;
+        if(pref) Object.keys(e500Plan).forEach(k => { if(k.startsWith(pref)){ delete e500Plan[k]; delete e500Hrs[k]; } }); }   // remplace le mois importé (efface les anciens jours erronés)
       Object.assign(e500Plan, stats.schedule || {}); Object.assign(e500Hrs, stats.heures || {}); window.__lastE500Schedule = stats.schedule || {}; saveE500Plan();
       e500Work.insertAdjacentHTML('beforeend', '<button class="btn-primary" id="e500IcsBtn" type="button" style="grid-column:1/-1;margin-top:12px;width:100%">📅 Ajouter ces services au calendrier</button>');
       try{ renderHomeCalendar(0, false); }catch(_){}
@@ -2143,11 +2145,13 @@ function parseE500Geo(page, nameParts, annee, mois){
     const code = tk.str.trim(), v = parseInt(code, 10);
     const key = `${annee}-${pad(mois)}-${pad(day)}`;
     const isSvc = !isNaN(v) && v >= 800 && v <= 999, isFor = /^(FOR|FORP)$/i.test(code);
-    if(!isSvc && !isFor) return;
-    schedule[key] = isFor ? 'FOR' : String(v);
     const col = times.filter(t => Math.abs(V(t) - V(tk)) < 4);
     const l2 = col.find(t => U(t) - U(tk) > 3 && U(t) - U(tk) < 11);
     const l3 = col.find(t => U(t) - U(tk) >= 11 && U(t) - U(tk) < 21);
+    // autres codes (EXT, OS, LST…) : retenus seulement s'ils portent des heures de début/fin
+    const isOther = !isSvc && !isFor && isNaN(v) && l2 && l3;
+    if(!isSvc && !isFor && !isOther) return;
+    schedule[key] = isFor ? 'FOR' : (isOther ? code.toUpperCase() : String(v));
     if(l2 && l3) heures[key] = { debut: hhmm(l2.str.trim()), fin: hhmm(l3.str.trim()) };
   });
   return Object.keys(schedule).length ? { schedule, heures } : null;
@@ -2301,7 +2305,7 @@ function buildE500StatsHTML(s){
   // Tableau 4 colonnes : Date | Service | Début/Fin | N°
   // Exclure FOR du comptage (formation ≠ service)
   const jours = Object.entries(s.schedule)
-    .filter(([,v]) => /^\d{3,}$/.test(v) || v === 'FOR')
+    .filter(([d,v]) => /^\d{3,}$/.test(v) || v === 'FOR' || (s.heures && s.heures[d]))
     .sort((a,b) => String(a[0]).localeCompare(String(b[0])));
 
   let serviceCount = 0;
@@ -2408,7 +2412,7 @@ let e500Plan = {};   // { 'YYYY-MM-DD': '868' | 'FOR' }
 let e500Hrs = {};    // { 'YYYY-MM-DD': { debut:'16:00', fin:'01:00' } }
 (async()=>{ try{ const r = await window.storage.get('e500-plan'); if(r && r.value){ const o = JSON.parse(r.value) || {}; if(o.p){ e500Plan = o.p; e500Hrs = o.h || {}; } else e500Plan = o; } }catch(e){} })();
 async function saveE500Plan(){ try{ await window.storage.set('e500-plan', JSON.stringify({ p:e500Plan, h:e500Hrs })); }catch(e){} }
-function e500PlanLabel(v){ return v === 'FOR' ? 'Formation (FOR)' : 'Service ' + v; }
+function e500PlanLabel(v){ return v === 'FOR' ? 'Formation (FOR)' : (/^\d+$/.test(v) ? 'Service ' + v : v); }
 function downloadE500Ics(schedule){
   const dtStamp = new Date().toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
   const days = Object.keys(schedule || {}).sort();
