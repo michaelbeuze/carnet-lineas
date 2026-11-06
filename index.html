@@ -5,17 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carnet de bord — Conducteur</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Carnet Lineas">
-<script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
-}
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1377,6 +1371,17 @@ if('serviceWorker' in navigator){
   .cal-dow{ font-size:10px; letter-spacing:.08em; color:var(--muted); font-weight:600; }
   .cal-day{ font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; line-height:1.1; }
   .cal-svc{ font-size:11px; min-height:14px; font-family:'JetBrains Mono',monospace; font-weight:700; }
+  .cal-chip.planned{ background:#1D4ED8; border-color:#4F83FF; color:#fff; }
+  .cal-chip.planned .cal-dow{ color:#C9DAFF; }
+  .cal-chip.planned .cal-svc{ color:#fff; font-weight:800; font-size:12px; }
+  .cal-chip.planned .cal-hrs{ font-family:'JetBrains Mono',monospace; font-size:10px; line-height:11px; text-align:center; color:#E6EEFF; }
+  .cal-chip.planned.selected{ box-shadow:inset 0 0 0 3px #fff; }
+  .day-card.planned{ background:#1D4ED8; border-color:#4F83FF; color:#fff; }
+  .day-card.planned .day-svc{ border-left-color:rgba(255,255,255,.35); }
+  .day-card.planned .day-svc-id{ font-size:26px; color:#fff; opacity:1; font-family:'JetBrains Mono',monospace; }
+  .day-card.planned .day-svc-hours{ color:#fff; }
+  .day-card.planned .day-svc-meta, .day-card.planned .day-rel, .day-card.planned .day-dow, .day-card.planned .day-month{ color:#DCE7FF; }
+  .day-card.planned .day-num{ color:#fff; }
   .cal-chip.has-service{ background:var(--lime); border-color:var(--lime); color:#0A0C0E; }
   .cal-chip.has-service .cal-dow{ color:rgba(10,12,14,.7); }
   .cal-chip.is-today{ border:2px solid #fff; }
@@ -1400,6 +1405,8 @@ if('serviceWorker' in navigator){
   .day-svc-route{ font-size:13px; font-weight:600; margin-top:4px; overflow-wrap:anywhere; }
   .day-svc.empty .day-svc-id{ font-size:18px; color:var(--text); opacity:.9; font-family:'Inter',sans-serif; }
   .day-card:not(.has-service) .day-svc-meta{ color:var(--muted); opacity:1; }
+  .day-del{ position:absolute; right:14px; top:10px; z-index:3; font:700 12px/1 inherit; padding:7px 10px; border-radius:10px; border:1.5px solid #B91C1C; background:rgba(255,255,255,.85); color:#B91C1C; }
+  .day-del[data-armed="1"]{ background:#B91C1C; color:#fff; }
   .day-open{ position:absolute; right:30px; bottom:10px; font-size:13px; font-weight:800; }
   .day-nav{ position:absolute; top:50%; transform:translateY(-50%); z-index:2; width:34px; height:56px; border:0; background:rgba(0,0,0,.28); color:#fff; font-size:28px; line-height:1; padding:0; border-radius:12px; }
   .day-nav.prev{ left:4px; } .day-nav.next{ right:4px; }
@@ -1979,10 +1986,10 @@ e500Input.addEventListener('change', async () => {
   e500Input.value = '';
   if(!file) return;
 
-  const driverName = document.getElementById('driverName').value.trim();
+  let driverName = document.getElementById('driverName').value.trim();
   if(!driverName){
-    alert('Renseigne ton nom dans Réglages (⚙) avant d\'importer le E 500.');
-    return;
+    driverName = await askDriverName();
+    if(!driverName) return;
   }
 
   importE500Btn.textContent = 'Analyse…';
@@ -2012,6 +2019,9 @@ e500Input.addEventListener('change', async () => {
         return;
       }
       e500Work.innerHTML = buildE500StatsHTML(stats);
+      Object.assign(e500Plan, stats.schedule || {}); Object.assign(e500Hrs, stats.heures || {}); window.__lastE500Schedule = stats.schedule || {}; saveE500Plan();
+      e500Work.insertAdjacentHTML('beforeend', '<button class="btn-primary" id="e500IcsBtn" type="button" style="grid-column:1/-1;margin-top:12px;width:100%">📅 Ajouter ces services au calendrier</button>');
+      try{ renderHomeCalendar(0, false); }catch(_){}
 
     }else{
       // ---- CAS 2 : Fiche(s) de service individuelle(s) ----
@@ -2094,6 +2104,55 @@ e500Input.addEventListener('change', async () => {
   importE500Btn.textContent = 'Choisir le PDF E 500';
 });
 
+/* ---- Lecture géométrique d'une page E500 : n° de service + heures début / fin par jour ---- */
+function parseE500Geo(page, nameParts, annee, mois){
+  const items = (page.items || []).filter(it => it.str && it.str.trim());
+  if(!items.length) return null;
+  const nz = x => normalizeStr(x);
+  const n1 = items.find(it => nz(it.str).includes(nameParts[0]));
+  if(!n1) return null;
+  const n2 = nameParts[1] ? items.find(it => nz(it.str).includes(nameParts[1]) && it !== n1 && (Math.abs(it.x-n1.x) < 30 || Math.abs(it.y-n1.y) < 30)) : null;
+  // axe des « lignes » (empilement des conducteurs) : celui sur lequel les deux parties du nom diffèrent
+  const rowAxis = (n2 && Math.abs(n2.x - n1.x) > Math.abs(n2.y - n1.y)) ? 'x' : (n2 ? 'y' : 'x');
+  const dayAxis = rowAxis === 'x' ? 'y' : 'x';
+  const U = it => it[rowAxis], V = it => it[dayAxis];
+  // en-tête : numéros de jour 1..31 alignés sur une même ligne
+  const groups = {};
+  items.forEach(it => { if(/^\d{1,2}$/.test(it.str.trim())){ const d = Number(it.str.trim()); if(d>=1 && d<=31){ const k = Math.round(U(it)*2)/2; (groups[k] = groups[k] || []).push(it); } } });
+  let best = null;
+  Object.values(groups).forEach(g => { const set = new Set(g.map(i => Number(i.str.trim()))); if(!best || set.size > best.set.size) best = { g, set }; });
+  if(!best || best.set.size < 20) return null;
+  const dayV = {}; best.g.forEach(it => { dayV[Number(it.str.trim())] = V(it); });
+  const dayList = Object.entries(dayV).map(([d,v]) => [Number(d), v]);
+  const step = Math.abs((dayV[2] ?? 0) - (dayV[1] ?? 0)) || 17;
+  const dayOf = v => { let bd = null, bdist = 1e9; dayList.forEach(([d,vv]) => { const dist = Math.abs(vv - v); if(dist < bdist){ bdist = dist; bd = d; } }); return bdist <= step*0.6 ? bd : null; };
+  // ligne des codes de service du conducteur : la ligne (même coordonnée « ligne ») qui porte le plus de codes, proche du nom
+  const u0 = U(n1);
+  const TOK = /^(\d{3,4}|[A-Z]{2,5})$/;
+  const lines = {};
+  items.forEach(it => { const du = U(it) - u0; if(du > -6 && du < 30 && TOK.test(it.str.trim()) && dayOf(V(it)) !== null){ const k = Math.round(U(it)*2)/2; (lines[k] = lines[k] || []).push(it); } });
+  let tokens = [];
+  Object.entries(lines).forEach(([k, arr]) => { if(arr.length > tokens.length || (arr.length === tokens.length && arr.length && Math.abs(Number(k)-u0) < Math.abs(U(tokens[0])-u0))) tokens = arr; });
+  if(tokens.length < 10) return null;
+  const times = items.filter(it => /^\d{1,3}:\d{2}$/.test(it.str.trim()));
+  const schedule = {}, heures = {};
+  const pad = n => String(n).padStart(2,'0');
+  const hhmm = t => { const [h,m] = t.split(':'); return pad(Number(h)) + ':' + m; };
+  tokens.forEach(tk => {
+    const day = dayOf(V(tk)); if(!day || !annee || !mois) return;
+    const code = tk.str.trim(), v = parseInt(code, 10);
+    const key = `${annee}-${pad(mois)}-${pad(day)}`;
+    const isSvc = !isNaN(v) && v >= 800 && v <= 999, isFor = /^(FOR|FORP)$/i.test(code);
+    if(!isSvc && !isFor) return;
+    schedule[key] = isFor ? 'FOR' : String(v);
+    const col = times.filter(t => Math.abs(V(t) - V(tk)) < 4);
+    const l2 = col.find(t => U(t) - U(tk) > 3 && U(t) - U(tk) < 11);
+    const l3 = col.find(t => U(t) - U(tk) >= 11 && U(t) - U(tk) < 21);
+    if(l2 && l3) heures[key] = { debut: hhmm(l2.str.trim()), fin: hhmm(l3.str.trim()) };
+  });
+  return Object.keys(schedule).length ? { schedule, heures } : null;
+}
+
 /* ---- Parseur planning mensuel E500 ---- */
 function parseE500Planning(pages, driverName){
   const normName = normalizeStr(driverName);
@@ -2175,8 +2234,6 @@ function parseE500Planning(pages, driverName){
       tokenSeq = allTokensRaw.slice(Math.max(0, firstPlanIdx));
     }
 
-    // DEBUG
-    alert('pos0='+pos0+' pos1='+pos1+'\nheaderDays: ' + headerDays.length + ' | tokens: ' + tokenSeq.length + '\nJours: ' + headerDays.slice(0,5).join(',') + '\nTokens: ' + tokenSeq.slice(0,10).join(','));
 
     // 3. Associer token[i] -> jour headerDays[i]
     const servicesByDay = {};
@@ -2197,6 +2254,12 @@ function parseE500Planning(pages, driverName){
         else if(isFor) servicesByDay[dateKey] = 'FOR';
       });
     }
+
+    // 3bis. Lecture géométrique (n° de service + heures début / fin) : prioritaire si elle aboutit
+    try{
+      const geo = parseE500Geo(page, nameParts, annee, mois);
+      if(geo){ Object.keys(servicesByDay).forEach(k => delete servicesByDay[k]); Object.assign(servicesByDay, geo.schedule); Object.assign(heuresByDay, geo.heures); }
+    }catch(e){ console.error('E500 géométrie', e); }
 
     // 4. Extraire les heures depuis le texte (zone après les tokens)
     // Les heures viennent des fiches de service importées (serviceHistory)
@@ -2340,6 +2403,43 @@ if(!window.storage){
 
 let trips = [];
 let serviceData = null;
+/* ---------------- E500 : services planifiés ---------------- */
+let e500Plan = {};   // { 'YYYY-MM-DD': '868' | 'FOR' }
+let e500Hrs = {};    // { 'YYYY-MM-DD': { debut:'16:00', fin:'01:00' } }
+(async()=>{ try{ const r = await window.storage.get('e500-plan'); if(r && r.value){ const o = JSON.parse(r.value) || {}; if(o.p){ e500Plan = o.p; e500Hrs = o.h || {}; } else e500Plan = o; } }catch(e){} })();
+async function saveE500Plan(){ try{ await window.storage.set('e500-plan', JSON.stringify({ p:e500Plan, h:e500Hrs })); }catch(e){} }
+function e500PlanLabel(v){ return v === 'FOR' ? 'Formation (FOR)' : 'Service ' + v; }
+function downloadE500Ics(schedule){
+  const dtStamp = new Date().toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+  const days = Object.keys(schedule || {}).sort();
+  if(!days.length) return 0;
+  const ev = days.map(k => {
+    const d0 = new Date(k + 'T00:00:00'); const d1 = new Date(d0.getTime() + 86400000);
+    const f = d => `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    const h = e500Hrs[k];
+    let when;
+    if(h && h.debut && h.fin){
+      const [sh, sm] = h.debut.split(':').map(Number), [eh, em] = h.fin.split(':').map(Number);
+      const startMin = sh*60 + sm; let endMin = eh*60 + em; let endDay = d0;
+      if(endMin <= startMin) endDay = d1;
+      const t = (d, hh, mm) => `${f(d)}T${String(hh).padStart(2,'0')}${String(mm).padStart(2,'0')}00`;
+      when = [`DTSTART;TZID=Europe/Brussels:${t(d0, sh, sm)}`, `DTEND;TZID=Europe/Brussels:${t(endDay, eh, em)}`];
+    }else when = [`DTSTART;VALUE=DATE:${f(d0)}`, `DTEND;VALUE=DATE:${f(d1)}`];
+    return ['BEGIN:VEVENT', `UID:e500-${k}@lineas-carnet`, `DTSTAMP:${dtStamp}`, ...when,
+            `SUMMARY:${e500PlanLabel(schedule[k])} — Lineas (E 500)`, 'DESCRIPTION:Prévu au planning E 500. Fiche de service à importer dans le carnet.', 'END:VEVENT'].join('\r\n');
+  });
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Carnet de bord Lineas//FR','CALSCALE:GREGORIAN','METHOD:PUBLISH', ...ev, 'END:VCALENDAR'].join('\r\n');
+  const blob = new Blob([ics], { type:'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'planning-e500.ics'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  return days.length;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#e500IcsBtn'); if(!b) return;
+  const n = downloadE500Ics(window.__lastE500Schedule || e500Plan);
+  try{ showSaveToast(n ? `📅 ${n} événement(s) prêts : ouvre le fichier pour les ajouter au calendrier` : 'Aucun service à exporter'); }catch(_){}
+});
+
 let serviceHistory = {};
 let calendarMonth = null;
 let selectedArchiveDate = null;
@@ -2355,6 +2455,30 @@ async function loadDriverName(){
   }catch(e){
     driverName = '';
   }
+}
+function askDriverName(){
+  return new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.innerHTML = `<div style="background:#1a1d21;color:#fff;border:1px solid #444;border-radius:18px;padding:20px;width:100%;max-width:340px">
+      <div style="font-weight:800;font-size:18px;margin-bottom:6px">Ton nom</div>
+      <div style="font-size:14px;opacity:.8;margin-bottom:12px">Inscris ton nom pour retrouver ton service dans le PDF.</div>
+      <input type="text" id="askNameInp" placeholder="Nom Prénom (ex. Beuze Michael)" autocomplete="name" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border-radius:10px;border:1px solid #666;background:#0e1013;color:#fff">
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button type="button" id="askNameNo" style="flex:1;padding:12px;border-radius:10px;border:1px solid #666;background:transparent;color:#fff;font-size:15px">Annuler</button>
+        <button type="button" id="askNameOk" style="flex:1;padding:12px;border-radius:10px;border:0;background:#C6F135;color:#0A0C0E;font-weight:800;font-size:15px">Valider</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const inp = ov.querySelector('#askNameInp'); setTimeout(() => inp.focus(), 50);
+    const done = async v => {
+      ov.remove();
+      if(v){ await saveDriverName(v); const i = document.getElementById('driverName'); if(i) i.value = v; }
+      resolve(v);
+    };
+    ov.querySelector('#askNameOk').onclick = () => done(inp.value.trim());
+    ov.querySelector('#askNameNo').onclick = () => done('');
+    inp.addEventListener('keydown', e => { if(e.key === 'Enter') done(inp.value.trim()); });
+  });
 }
 async function saveDriverName(name){
   driverName = name;
@@ -3754,9 +3878,12 @@ pdfInput.addEventListener('change', async () => {
     let matchedIndices = [];
     if(pages.length > 1){
       if(!driverName.trim()){
-        importStatus('Ce PDF contient plusieurs pages. Renseigne ton nom dans Réglages (⚙) pour que ton service soit retrouvé automatiquement.');
-        importPdfBtn.textContent = originalLabel;
-        return;
+        const nm = await askDriverName();
+        if(!nm){
+          importStatus('Nom nécessaire pour retrouver ton service dans ce PDF.');
+          importPdfBtn.textContent = originalLabel;
+          return;
+        }
       }
       matchedIndices = pages
         .map((p, idx) => pageMatchesName(p.text, driverName) ? idx : -1)
@@ -3898,9 +4025,10 @@ function renderHomeCalendar(dir, scrollSel){
     const num = sv && sv.prestation ? (sv.prestation.match(/(\d+)\s*$/) || [,''])[1] : '';
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'cal-chip' + (sv ? ' has-service' : '') + (key === dayKey(today) ? ' is-today' : '') + (key === selKey ? ' selected' : '') + ((d.getDay()===0||d.getDay()===6) ? ' weekend' : '');
+    const pl = !sv ? e500Plan[key] : null;
+    b.className = 'cal-chip' + (sv ? ' has-service' : '') + (pl ? ' planned' : '') + (key === dayKey(today) ? ' is-today' : '') + (key === selKey ? ' selected' : '') + ((d.getDay()===0||d.getDay()===6) ? ' weekend' : '');
     b.dataset.key = key; b.dataset.month = `${MOIS_LONGS[d.getMonth()]} ${d.getFullYear()}`;
-    b.innerHTML = `<span class="cal-dow">${JOURS_COURTS[d.getDay()]}</span><span class="cal-day">${d.getDate()}</span><span class="cal-svc">${sv ? (num || '●') : ''}</span>`;
+    b.innerHTML = `<span class="cal-dow">${JOURS_COURTS[d.getDay()]}</span><span class="cal-day">${d.getDate()}</span><span class="cal-svc">${sv ? (num || '●') : (pl ? (pl === 'FOR' ? 'FOR' : pl) : '')}</span>${(pl && e500Hrs[key]) ? `<span class="cal-hrs">${e500Hrs[key].debut}<br>${e500Hrs[key].fin}</span>` : ''}`;
     const dd = new Date(d);
     b.addEventListener('click', () => { homeDay = dd; renderHomeCalendar(0, false); });
     strip.appendChild(b);
@@ -3956,11 +4084,13 @@ function renderDayCard(dir){
         <div class="day-svc-route">${line1}</div>
         <div class="day-svc-meta">${line2}</div>
       </div>`;
+  }else if(e500Plan[key]){
+    body = `<div class="day-svc empty"><div class="day-svc-id">${escapeHtml(e500Plan[key] === 'FOR' ? 'FOR' : e500Plan[key])}</div>${e500Hrs[key] ? `<div class="day-svc-hours">${e500Hrs[key].debut} → ${e500Hrs[key].fin}</div>` : ''}<div class="day-svc-meta">Prévu (E 500) · importe la fiche dans « Service » pour le détail</div></div>`;
   }else{
     body = `<div class="day-svc empty"><div class="day-svc-id">Aucun service</div><div class="day-svc-meta">Importe le PDF dans « Service »</div></div>`;
   }
 
-  card.className = 'day-card' + (sv ? ' has-service' : '') + (diff === 0 ? ' is-today' : '');
+  card.className = 'day-card' + (sv ? ' has-service' : '') + ((!sv && e500Plan[key]) ? ' planned' : '') + (diff === 0 ? ' is-today' : '');
   card.dataset.key = key;
   card.innerHTML = `
     <div class="day-left">
@@ -3969,7 +4099,27 @@ function renderDayCard(dir){
       <div class="day-dow">${JOURS_LONGS[d.getDay()]}</div>
       <div class="day-month">${MOIS_LONGS[d.getMonth()]} ${d.getFullYear()}</div>
     </div>${body}
-    ${sv ? '<div class="day-open">Ouvrir ›</div>' : ''}`;
+    ${sv ? '<div class="day-open">Ouvrir ›</div>' : ''}
+    ${(sv || e500Plan[key]) ? '<button type="button" class="day-del" data-armed="0">🗑 Supprimer</button>' : ''}`;
+  const delBtn = card.querySelector('.day-del');
+  if(delBtn) delBtn.addEventListener('click', async ev => {
+    ev.stopPropagation(); ev.preventDefault();
+    if(delBtn.dataset.armed !== '1'){
+      delBtn.dataset.armed = '1'; delBtn.textContent = 'Confirmer la suppression';
+      clearTimeout(delBtn._t); delBtn._t = setTimeout(() => { delBtn.dataset.armed = '0'; delBtn.textContent = '🗑 Supprimer'; }, 4000);
+      return;
+    }
+    if(serviceHistory[key]){
+      delete serviceHistory[key];
+      try{ await window.storage.set('service-history', JSON.stringify(serviceHistory)); }catch(e){}
+    }else if(e500Plan[key]){
+      delete e500Plan[key]; delete e500Hrs[key];
+      await saveE500Plan();
+    }
+    renderHomeCalendar(0, false);
+    try{ if(typeof renderResume === 'function') renderResume(); }catch(e){}
+    showSaveToast('Supprimé');
+  });
   if(dir && card.animate) card.animate([{ transform:`translateX(${dir*46}px)`, opacity:0.2 }, { transform:'none', opacity:1 }], { duration:200, easing:'ease-out' });
 }
 function shiftHomeDay(n){
@@ -3989,7 +4139,8 @@ function shiftHomeDay(n){
     x0 = null;
     if(Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5){ shiftHomeDay(dx < 0 ? 1 : -1); e.preventDefault(); }
   });
-  card.addEventListener('click', () => {
+  card.addEventListener('click', ev => {
+    if(ev.target.closest && ev.target.closest('.day-del')) return;
     const key = card.dataset.key;
     if(serviceHistory[key]) openServiceFor(key);
     else showSaveToast('Aucun service enregistré ce jour. Importe le PDF dans « Service ».');
@@ -4717,5 +4868,10 @@ function buildLegCardHTML(leg, i){
 })();
 </script>
 
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('service-worker.js').catch(()=>{}));
+}
+</script>
 </body>
 </html>
