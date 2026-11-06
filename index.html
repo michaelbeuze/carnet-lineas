@@ -1347,6 +1347,20 @@ if('serviceWorker' in navigator){
   .home-cal{ margin:4px 0 16px; }
   .home-cal-head{ display:flex; justify-content:space-between; align-items:center; margin:0 4px 8px; }
   .home-cal-month{ font-weight:700; font-size:15px; }
+  .home-cal-month{ cursor:pointer; }
+  .home-cal-month::after{ content:' ▾'; color:var(--lime); }
+  #monthPicker{ position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center; }
+  #monthPicker[hidden]{ display:none; }
+  .mp-card{ width:100%; max-width:480px; background:#13171A; border:1px solid #262C30; border-radius:18px 18px 0 0; padding:16px 16px 28px; color:var(--text); }
+  .mp-year{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-weight:700; font-size:18px; }
+  .mp-year button{ background:transparent; border:1px solid #3A4348; color:var(--text); border-radius:10px; width:44px; height:38px; font-size:20px; }
+  .mp-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .mp-grid button{ background:#0E1215; border:1px solid #2F373C; color:var(--text); border-radius:12px; padding:14px 4px; font-size:15px; position:relative; }
+  .mp-grid button.cur{ border-color:var(--lime); }
+  .mp-grid button.sel{ background:var(--lime); color:#0A0C0E; font-weight:700; }
+  .mp-grid button .dot{ position:absolute; top:6px; right:8px; width:6px; height:6px; border-radius:50%; background:var(--lime); }
+  .mp-grid button.sel .dot{ background:#0A0C0E; }
+
   .home-cal-today{ background:transparent; border:1px solid #3A4348; color:var(--lime); border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600; }
   .home-cal-strip{ display:flex; gap:8px; overflow-x:auto; padding:4px 2px 8px; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .home-cal-strip::-webkit-scrollbar{ display:none; }
@@ -2859,7 +2873,7 @@ function openTrainSheet(fi, li){
         </div>
         <div class="sheet-sub" style="margin-top:14px">KVB</div>
         <div class="sheet-grid">
-          <div class="field-mini"><label>Catégorie KVB</label><select data-f="kvbCat" ${f.hlp?'disabled':''}>${KVB_CATS.map(c=>`<option value="${c}" ${(f.kvbCat||'MA100')===c?'selected':''}>${c.slice(0,2)} ${c.slice(2)}</option>`).join('')}</select></div>
+          <div class="field-mini"><label>Catégorie KVB ${f.kvbCatTc?'(du TC286)':'(TC286 à importer)'}</label>${f.kvbCatTc?`<div class="kvb-out" style="font-size:18px">${escapeHtml((f.kvbCat||'MA100').replace(/^(MA|ME)/,'$1 '))}</div>`:`<select data-f="kvbCat" ${f.hlp?'disabled':''}>${KVB_CATS.map(c=>`<option value="${c}" ${(f.kvbCat||'MA100')===c?'selected':''}>${c.slice(0,2)} ${c.slice(2)}</option>`).join('')}</select>`}</div>
           <div class="field-mini"><label>Paramètres à afficher</label><div class="kvb-out">${(()=>{const kv=kvbCalc(f);return kv.err?'<span class="kvb-err">'+escapeHtml(kv.err)+'</span>':escapeHtml(kv.txt);})()}</div></div>
         </div>
         <button class="btn-save-trip" data-sh="kvbver" type="button" style="margin-top:8px">🔍 Vérification KVB</button><div id="kvbVerBox" hidden>${kvbVerifyHTML(f)}</div>
@@ -3675,6 +3689,7 @@ pdfInput.addEventListener('change', async () => {
   const file = pdfInput.files[0];
   pdfInput.value = '';
   if(!file) return;
+  primeSavePermission();   // autorisation du dossier demandée tout de suite, avant la lecture
 
   const originalLabel = importPdfBtn.textContent;
   importStatus('Analyse du PDF…');
@@ -3787,6 +3802,32 @@ async function openServiceFor(key){
 }
 
 
+
+/* ---- Choix du mois (accueil) ---- */
+let mpYear = null;
+function openMonthPicker(){
+  let el = document.getElementById('monthPicker');
+  if(!el){ el = document.createElement('div'); el.id = 'monthPicker'; document.body.appendChild(el); el.addEventListener('click', e => { if(e.target === el) el.hidden = true; }); }
+  const today = new Date(); today.setHours(0,0,0,0);
+  if(!homeDay) homeDay = new Date(today);
+  if(mpYear === null) mpYear = homeDay.getFullYear();
+  const history = serviceHistory || {};
+  const draw = () => {
+    el.innerHTML = `<div class="mp-card"><div class="mp-year"><button type="button" data-y="-1">‹</button><span>${mpYear}</span><button type="button" data-y="1">›</button></div><div class="mp-grid">${MOIS_LONGS.map((m,i)=>{
+      const pref = `${mpYear}-${String(i+1).padStart(2,'0')}-`;
+      const has = Object.keys(history).some(k => k.startsWith(pref));
+      const cur = (today.getFullYear()===mpYear && today.getMonth()===i), sel = (homeDay.getFullYear()===mpYear && homeDay.getMonth()===i);
+      return `<button type="button" data-m="${i}" class="${cur?'cur ':''}${sel?'sel':''}">${m.charAt(0).toUpperCase()+m.slice(1)}${has?'<span class="dot"></span>':''}</button>`; }).join('')}</div></div>`;
+    el.querySelectorAll('[data-y]').forEach(b => b.onclick = () => { mpYear += Number(b.dataset.y); draw(); });
+    el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+      const m = Number(b.dataset.m);
+      homeDay = (today.getFullYear()===mpYear && today.getMonth()===m) ? new Date(today) : new Date(mpYear, m, 1);
+      el.hidden = true; mpYear = null; renderHomeCalendar(0, 'left');
+    });
+  };
+  draw(); el.hidden = false;
+}
+document.getElementById('homeCalMonth').addEventListener('click', openMonthPicker);
 function renderHomeCalendar(dir, scrollSel){
   const strip = document.getElementById('homeCalStrip'); if(!strip) return;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -3812,6 +3853,7 @@ function renderHomeCalendar(dir, scrollSel){
   const selChip = strip.querySelector('.selected'), todayChip = strip.querySelector('.is-today');
   const place = () => {
     if(!hadChips && selChip){ strip.scrollLeft = Math.max(0, selChip.offsetLeft - strip.offsetLeft - 8); }
+    else if(scrollSel === 'left' && selChip){ strip.scrollTo({ left: Math.max(0, selChip.offsetLeft - strip.offsetLeft - 8), behavior:'auto' }); }
     else if(scrollSel && selChip){ strip.scrollTo({ left: Math.max(0, selChip.offsetLeft - strip.offsetLeft - strip.clientWidth/2 + selChip.offsetWidth/2), behavior:'smooth' }); }
     else strip.scrollLeft = prevScroll;
     updateCalMonth();
@@ -3950,6 +3992,13 @@ function parseTc286(pages){
   const pd = items.find(it => /\d{4}\s?\d{4}\s?\d{3}-\d\s*\/\s*\d{4}\s?\d{4}\s?\d{3}-\d/.test(it.str));
   if(pd) out.premierDernier = pd.str;
   const idxLab = items.find(it => /Samenstellingsindex/i.test(it.str));
+  // Catégorie KVB = valeur sous la colonne « FR » de l'indice de composition (ex. MA100)
+  if(idxLab){
+    const cands = items.filter(it => Math.abs(it.y - idxLab.y) <= 6 && it.x > 350 && /^(MA|ME)\s?\d{2,3}$/.test(it.str));
+    const fr = items.filter(it => it.str === 'FR' && it.x > 350 && Math.abs(it.y - idxLab.y) <= 24)[0];
+    cands.sort((p,q) => fr ? Math.abs(p.x - fr.x) - Math.abs(q.x - fr.x) : q.x - p.x);
+    if(cands.length) out.kvbCat = cands[0].str.replace(/\s/g,'');
+  }
   if(idxLab) out.indice = items.filter(it => Math.abs(it.y - idxLab.y) <= 3 && it.x > 350).sort((a,b) => a.x - b.x).map(it => it.str).join(' ');
   return out;
 }
@@ -3962,7 +4011,7 @@ function findTrainGroup(trNr){
 }
 
 const TC_FIELDS = [
-  ['locoType','Série loco','text'], ['nbLocos','Locos en traction','number'], ['nbLocosRemorquees','Locos remorquées (véhicules)','number'], ['wagons','Wagons','number'],
+  ['kvbCat','Catégorie KVB (colonne FR)','text'], ['locoType','Série loco','text'], ['nbLocos','Locos en traction','number'], ['nbLocosRemorquees','Locos remorquées (véhicules)','number'], ['wagons','Wagons','number'],
   ['longueur','Longueur (m)','number'], ['masse','Masse (t)','number'],
   ['masseFreinee','Masse freinée (t)','number'], ['pctFrein','% frein réalisé','number'],
   ['masseNecessaire','Masse freinée nécessaire (t)','number'], ['pctNecessaire','% nécessaire','number']
@@ -4000,6 +4049,7 @@ function showTcReview(parsed, fi, li, fileInfo){
     const o = collect(), tgt = serviceData.legs[idx];
     TC_FIELDS.forEach(([k]) => { if(o[k] !== null && o[k] !== undefined && o[k] !== '') tgt[k] = o[k]; });
     if(o.premierDernier) tgt.premierDernier = o.premierDernier;
+    if(o.kvbCat && KVB_CATS.includes(o.kvbCat)) tgt.kvbCatTc = true; else if(o.kvbCat) tgt.kvbCat = '';
     if(fileInfo && fileInfo.dataUrl){ tgt.tc286Pdf = fileInfo.dataUrl; tgt.tc286PdfName = fileInfo.name; }
     saveService();
   };
@@ -4076,6 +4126,13 @@ function showSaveToast(msg, actionLabel, actionFn){
   if(!actionLabel) setTimeout(() => { if(el.firstChild === t) el.hidden = true; }, 6000);
 }
 
+async function primeSavePermission(){
+  try{
+    if(PDFSAVE.mode !== 'folder' || !window.showDirectoryPicker) return;
+    const h = PDFSAVE.handle || await idbGet('pdfDir'); if(!h) return;
+    await dirPermission(h, true);
+  }catch(e){}
+}
 async function dirPermission(h, request){
   try{
     if(!h.queryPermission) return true;
