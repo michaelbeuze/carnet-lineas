@@ -359,6 +359,17 @@ if('serviceWorker' in navigator){
   }
   .ops-kvb{margin-top:4px;font-size:13px;color:var(--lime)}
   .ops-kvb .kvb-err,.kvb-err{color:#ff9a6b;font-size:12px}
+  .kvb-scroll{ max-height:340px; overflow:auto; border:1px solid #444; border-radius:8px; margin:8px 0 4px; -webkit-overflow-scrolling:touch; }
+  .kvb-full{ border-collapse:separate; border-spacing:0; width:100%; min-width:100%; table-layout:fixed; font-size:10.5px; font-family:'JetBrains Mono',monospace; text-align:center; }
+  .kvb-full th, .kvb-full td{ padding:6px 1px; border-bottom:1px solid #2b3135; border-right:1px solid #2b3135; }
+  .kvb-full thead th{ position:sticky; top:0; background:#1b2024; z-index:2; font-weight:700; }
+  .kvb-full tbody th, .kvb-full thead th:first-child{ width:74px; font-size:10px; }
+  .kvb-full tbody th{ text-align:left; white-space:nowrap; font-weight:600; color:var(--muted); padding-left:5px; }
+  .kvb-full tr.hlr th, .kvb-full tr.hlr td{ background:rgba(198,224,0,.28); color:#fff; }
+  .kvb-full td.hlc, .kvb-full thead th.hlc{ background:rgba(198,224,0,.28); }
+  .kvb-full thead th.hlc{ background:var(--lime); color:#000; }
+  .kvb-full td.pick{ background:var(--lime); color:#000; font-weight:800; outline:3px solid #fff; outline-offset:-3px; border-radius:50%/40%; }
+  .kvb-legend{ font-size:11px; color:var(--muted); }
   .kvb-ver{margin-top:8px;font-size:13px;line-height:1.5}
   .kvb-tab{border-collapse:collapse;margin:6px 0;font-size:12px;width:100%}
   .kvb-tab th,.kvb-tab td{border:1px solid #444;padding:4px 3px;text-align:center}
@@ -1097,6 +1108,8 @@ if('serviceWorker' in navigator){
     flex-direction:column;
     gap:8px;
   }
+  .resume-tap{ cursor:pointer; }
+  .resume-tap:active{ border-color:var(--lime); }
   .resume-row{
     background:var(--card);
     border:1px solid var(--border);
@@ -1256,6 +1269,7 @@ if('serviceWorker' in navigator){
   .leg-card, .trip-card{ border-left:1px solid var(--border); }
   .service-top{ background:transparent; border:0; box-shadow:none; }
   .import-hero{ margin:16px; padding:18px 16px; }
+  .import-hero[hidden]{ display:none; }
   .home-tile:hover{ border-color:var(--lime); transform:none; }
   .home-tile:nth-child(n){ background:var(--card); }
   .home-tile-icon{ color:var(--lime); }
@@ -1714,7 +1728,7 @@ function showPage(name, opts){
   pageSubtitle.textContent = PAGE_TITLES[name] || 'Carnet de bord';
   if(name === 'trains'){ renderBoard(); renderCalendar(); }
   if(name === 'home'){ renderHomeCalendar(); }
-  if(name === 'service'){ if(!opts.keep) pickCurrentService(); renderService(); renderLegs(); showServiceActions(); }
+  if(name === 'service'){ const hero = document.querySelector('#pageService .import-hero'); if(hero) hero.hidden = !!opts.keep; if(!opts.keep) pickCurrentService(); renderService(); renderLegs(); showServiceActions(); }
   if(name === 'resume'){ renderResume(); }
   if(name === 'settings'){ renderSettings(); }
   window.scrollTo(0,0);
@@ -1758,6 +1772,10 @@ function filterTrips(trips){
   }
 }
 
+document.addEventListener('click', e => {
+  const r = e.target.closest && e.target.closest('#resumeList .resume-tap'); if(!r) return;
+  openServiceFor(r.dataset.svc);
+});
 function renderResume(){
   const navLabel  = document.getElementById('resumeNavLabel');
   const kpisEl    = document.getElementById('resumeKpis');
@@ -1854,9 +1872,9 @@ function renderResume(){
       </div>
     </div>
     ${serviceDetails.length > 0 ? serviceDetails.map(s => `
-      <div class="resume-row">
+      <div class="resume-row resume-tap" data-svc="${s.key}">
         <div>
-          <div class="resume-row-label">${s.prestation}</div>
+          <div class="resume-row-label">${s.prestation} ›</div>
           <div class="resume-row-sub">${s.key}</div>
         </div>
         <div class="resume-row-count" style="font-size:16px">${s.duree}</div>
@@ -1887,7 +1905,7 @@ function renderResume(){
     const deduped = [...seen.values()].sort((a,b) => (a.date+a.depart) < (b.date+b.depart) ? -1 : 1);
 
     listEl.innerHTML = deduped.map(t => `
-      <div class="resume-row">
+      <div class="resume-row${serviceHistory[t.date]?' resume-tap':''}" ${serviceHistory[t.date]?`data-svc="${t.date}"`:''}>
         <div>
           <div class="resume-row-label">${fmtDate(t.date)}</div>
           ${(()=>{ const svc = serviceHistory[t.date]; return svc ? `<div class="resume-row-sub" style="margin-top:2px;color:var(--lime);font-size:12px;font-weight:600">${svc.prestation || ''}</div>` : ''; })()}
@@ -2693,13 +2711,13 @@ const KVB_ME = {"ME140":[[0,20,null,20,21,21,22,22,23,24],[21,100,20,100,103,106
 const KVB_CATS = ['MA100','MA90','MA80','ME140','ME120','ME100'];
 function kvbCalc(f){
   if(!f) return null;
-  if(f.hlp) return { cls:'ME', vit:'100', lg:0, dec:'057', txt:'KVB ME 100 · 0 · 057', hlp:true };
+  if(f.hlp) return { cls:'ME', vit:'100', lg:0, dec:'057', txt:'KVB : ME - 10 - 0 - 057', hlp:true };
   const m = Number(f.masse), mf = Number(f.masseFreinee), L = Number(f.longueur);
   const cat = KVB_CATS.includes(f.kvbCat) ? f.kvbCat : 'MA100';
   const cls = cat.slice(0,2), vit = cat.slice(2);
   const table = cls==='MA' ? KVB_MA : KVB_ME[cat];
   const decs = cls==='MA' ? KVB_MA_DECEL : KVB_ME_DECEL[cat];
-  const base = { cat, cls, vit, m, mf, L, decs };
+  const base = { cat, cls, vit, m, mf, L, decs, table };
   if(!m || !mf || !L) return { ...base, err:'Renseigner masse, masse freinée et longueur' };
   const lg = Math.ceil(L/100);
   const row = table.find(r => m >= r[0] && m <= r[1]);
@@ -2708,15 +2726,21 @@ function kvbCalc(f){
   for(let i=0;i<8;i++){ const t = row[2+i]; if(t === null || mf >= t) k = i; }
   if(k < 0) return { ...base, lg, row, err:'Masse freinée insuffisante (< '+row[2]+' T)' };
   const dec = decs[k];
-  return { ...base, lg, row, k, dec, txt: 'KVB '+cls+' '+vit+' · '+lg+' · '+dec };
+  return { ...base, lg, row, k, dec, txt: 'KVB : '+cls+' - '+String(Math.round(Number(vit)/10)).padStart(2,'0')+' - '+lg+' - '+dec };
 }
 function kvbVerifyHTML(f){
   const kv = kvbCalc(f); if(!kv) return '';
-  if(kv.hlp) return '<div class="kvb-ver">HLP (loco seule) : tableau C20.12 → ME 100 · classe ME · vitesse 10 · longueur 0 · décélération 057</div>';
+  if(kv.hlp) return '<div class="kvb-ver">HLP (loco seule) : tableau C20.12 → ME 100 · vitesse 10 · longueur 0 · décélération 057</div>';
   let h = `<div class="kvb-ver"><div>Tableau <b>${kv.cls==='MA'?'C20.11 MA 100/90/80':'C20.10 '+kv.cat.replace('ME','ME ')}</b></div>
+    <div>Vitesse affichée (2 chiffres) : <b>${String(Math.round(Number(kv.vit)/10)).padStart(2,'0')}</b> (${kv.vit} km/h)</div>
     <div>Masse totale lue : <b>${kv.m||'—'} t</b> · masse freinée : <b>${kv.mf||'—'} T</b> · longueur : <b>${kv.L||'—'} m</b> → <b>${kv.lg!=null?kv.lg:'—'}</b> (centaine supérieure)</div>`;
   if(kv.row){
-    h += `<div>Ligne choisie : masse totale <b>${kv.row[0]} à ${kv.row[1]} t</b></div><table class="kvb-tab"><tr><th>Masse freinée ≥</th>${kv.row.slice(2).map((t,i)=>`<td class="${i===kv.k?'sel':''}">${t===null?'—':t}</td>`).join('')}</tr><tr><th>Décélération</th>${kv.decs.map((d,i)=>`<td class="${i===kv.k?'sel':''}">${d}</td>`).join('')}</tr></table>`;
+    h += `<div>Ligne choisie : masse totale <b>${kv.row[0]} à ${kv.row[1]} t</b></div>
+    <div class="kvb-scroll" id="kvbScroll"><table class="kvb-full"><thead><tr><th>Masse (t)</th>${kv.decs.map((d,i)=>`<th class="${i===kv.k?'hlc':''}">${d}</th>`).join('')}</tr></thead><tbody>${kv.table.map(r=>{
+      const isRow = r===kv.row;
+      const lab = r[0]===0 ? `jusqu'à ${r[1]}` : `${r[0]} à ${r[1]}`;
+      return `<tr class="${isRow?'hlr':''}"><th>${lab}</th>${r.slice(2).map((t,i)=>`<td class="${(!isRow&&i===kv.k)?'hlc':''}${(isRow&&i===kv.k)?' pick':''}">${t===null?'':t}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>
+    <div class="kvb-legend">Ligne verte = ta masse totale · colonne verte = décélération retenue · case entourée = valeur choisie</div>`;
     h += kv.err ? `<div class="kvb-err">${escapeHtml(kv.err)}</div>` : `<div>Case retenue : <b>${kv.row[2+kv.k]===null?'première colonne':kv.row[2+kv.k]+' T'}</b> (la plus grande valeur ≤ ${kv.mf} T) → décélération <b>${kv.dec}</b></div>`;
   } else h += `<div class="kvb-err">${escapeHtml(kv.err)}</div>`;
   return h + '</div>';
@@ -2814,9 +2838,7 @@ function openTrainSheet(fi, li){
         <div class="sheet-sub">Bulletin de freinage (TC286)</div>
         <button class="btn-camera" data-sh="tcpdf" type="button">📄 Importer le PDF du TC286</button>
         ${f.tc286Pdf ? `<a class="tc-link" href="${f.tc286Pdf}" download="${escapeHtml(f.tc286PdfName || 'TC286.pdf')}">📎 ${escapeHtml(f.tc286PdfName || 'TC286.pdf')}</a>` : ''}
-        <button class="btn-camera" data-sh="photo" type="button" style="margin-top:8px">📷 Photo du TC286 papier</button>
-        ${f.tc286 ? `<img class="sheet-photo" src="${f.tc286}" alt="TC286">` : ''}
-        <div class="sheet-hint">Le PDF est lu automatiquement. La photo est seulement jointe au train (lecture de photo : à venir).</div>
+        <div class="sheet-hint">Le PDF du TC286 est lu automatiquement.</div>
       </div>
 
       <div class="sheet-card">
@@ -2855,16 +2877,6 @@ function openTrainSheet(fi, li){
   el.querySelector('#shReelDebut').onchange = e => { f.reelDebut = e.target.value; saveService(); openTrainSheet(fi, li); };
   el.querySelector('#shReelFin').onchange   = e => { l.reelFin = e.target.value; saveService(); openTrainSheet(fi, li); };
   el.querySelector('[data-sh="tcpdf"]').onclick = () => pickTc286(fi, li);
-  el.querySelector('[data-sh="photo"]').onclick = () => {
-    let inp = document.getElementById('tc286Input');
-    if(!inp){ inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.id='tc286Input'; inp.setAttribute('capture','environment'); inp.hidden = true; document.body.appendChild(inp); }
-    inp.onchange = async () => {
-      const file = inp.files[0]; inp.value=''; if(!file) return;
-      try{ f.tc286 = await resizeImageMax(file, 1400); await saveService(); }catch(e){ console.error(e); }
-      openTrainSheet(fi, li);
-    };
-    inp.click();
-  };
   el.querySelectorAll('[data-f]').forEach(inp => {
     inp.addEventListener('change', () => {
       const k = inp.dataset.f;
@@ -2880,7 +2892,7 @@ function openTrainSheet(fi, li){
       saveService();
     });
   });
-  el.querySelector('[data-sh="kvbver"]').onclick = () => { const b = el.querySelector('#kvbVerBox'); b.hidden = !b.hidden; };
+  el.querySelector('[data-sh="kvbver"]').onclick = () => { const b = el.querySelector('#kvbVerBox'); b.hidden = !b.hidden; if(!b.hidden){ const sc = b.querySelector('#kvbScroll'), r = b.querySelector('tr.hlr'); if(sc && r){ sc.scrollTop = Math.max(0, r.offsetTop - sc.clientHeight/2 + r.offsetHeight/2); const pk = sc.querySelector('td.pick'); if(pk) sc.scrollLeft = Math.max(0, pk.offsetLeft - sc.clientWidth/2); } } };
   el.querySelector('[data-sh="trip"]').onclick = () => {
     const btn = document.querySelector(`#legList .btn-save-trip[data-leg="${fi}"]`);
     if(btn) btn.click();
