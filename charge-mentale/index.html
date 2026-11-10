@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Esprit léger</title>
+<meta name="description" content="Vider sa tête, trier, partager : une app contre la charge mentale.">
+<meta name="theme-color" content="#1F3A35">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Esprit léger">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F1E7; --card:#FFFFFF; --ink:#1E2B28; --muted:#6B7772; --line:#E4DDCF;
+    --accent:#2F5D55; --accent-soft:#DCEAE5; --warm:#D9825B; --warm-soft:#F8E3D7;
+    --ok:#3C8D5A; --shadow:0 1px 2px rgba(30,43,40,.06),0 4px 14px rgba(30,43,40,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121917; --card:#1B2421; --ink:#EDE8DD; --muted:#93A09A; --line:#2A3531;
+      --accent:#86C2B3; --accent-soft:#22362F; --warm:#E8A87C; --warm-soft:#3A2A22;
+      --ok:#7CC796; --shadow:none;
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font:16px/1.45 'Inter',system-ui,sans-serif;min-height:100vh;
+    padding:env(safe-area-inset-top) 0 calc(84px + env(safe-area-inset-bottom));}
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:700;margin:0;letter-spacing:-.01em;}
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;}
+  input,textarea,select{font:inherit;color:var(--ink);}
+  main{max-width:640px;margin:0 auto;padding:16px;}
+  .hidden{display:none !important;}
+
+  header.top{max-width:640px;margin:0 auto;padding:18px 16px 4px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  header.top h1{font-size:26px;}
+  header.top .date{color:var(--muted);font-size:13px;margin-top:2px;}
+
+  /* Jauge de charge */
+  .gauge{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .gauge-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .gauge-label{font-size:13px;color:var(--muted);}
+  .gauge-value{font-weight:600;}
+  .bar{height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin:10px 0 8px;}
+  .bar > i{display:block;height:100%;border-radius:6px;transition:width .5s ease, background .5s;}
+  .gauge-tip{font-size:14px;color:var(--muted);}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .card h2{font-size:20px;margin-bottom:4px;}
+  .card .sub{color:var(--muted);font-size:14px;margin:0 0 12px;}
+  .section-title{display:flex;justify-content:space-between;align-items:baseline;margin:22px 4px 10px;}
+  .section-title h3{font-size:17px;}
+  .section-title span{color:var(--muted);font-size:13px;}
+
+  textarea.dump{width:100%;min-height:110px;resize:vertical;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--bg);outline:none;}
+  textarea.dump:focus,input.field:focus,select.field:focus{border-color:var(--accent);}
+  input.field,select.field{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--bg);outline:none;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;border-radius:12px;font-weight:600;font-size:15px;}
+  .btn.primary{background:var(--accent);color:var(--card);}
+  .btn.ghost{background:var(--accent-soft);color:var(--accent);}
+  .btn.full{width:100%;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .row.wrap{flex-wrap:wrap;}
+  .mt{margin-top:10px;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px;}
+  .chip{font-size:13px;padding:6px 10px;border-radius:20px;background:var(--accent-soft);color:var(--accent);}
+  .prompt{font-size:14px;color:var(--muted);min-height:20px;margin-top:8px;font-style:italic;}
+
+  /* Liste */
+  ul.list{list-style:none;margin:0;padding:0;}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px;margin-bottom:8px;box-shadow:var(--shadow);}
+  .item-main{display:flex;gap:10px;align-items:flex-start;}
+  .item-text{flex:1;word-break:break-word;padding-top:2px;}
+  .item-meta{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .check{width:26px;height:26px;border-radius:50%;border:2px solid var(--accent);flex-shrink:0;display:grid;place-items:center;}
+  .check.done{background:var(--accent);}
+  .check.done::after{content:'';width:10px;height:6px;border:2px solid var(--card);border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px);}
+  .item.is-done .item-text{text-decoration:line-through;color:var(--muted);}
+  .star{font-size:20px;line-height:1;opacity:.35;padding:2px;}
+  .star.on{opacity:1;}
+  .actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .act{font-size:13px;font-weight:600;padding:7px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);}
+  .act.today{background:var(--accent-soft);border-color:transparent;color:var(--accent);}
+  .act.drop{color:var(--muted);}
+  .x{color:var(--muted);font-size:20px;line-height:1;padding:0 4px;}
+  .empty{text-align:center;color:var(--muted);font-size:14px;padding:18px 10px;border:1px dashed var(--line);border-radius:14px;}
+  .tag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--warm-soft);color:var(--warm);margin-right:4px;}
+
+  .person{margin-bottom:14px;}
+  .person-head{display:flex;justify-content:space-between;align-items:center;margin:0 4px 8px;}
+  .person-head strong{font-size:15px;}
+
+  /* Météo */
+  .moods{display:flex;justify-content:space-between;gap:6px;}
+  .mood{flex:1;font-size:26px;padding:10px 0;border-radius:14px;background:var(--bg);border:2px solid transparent;}
+  .mood.on{border-color:var(--accent);background:var(--accent-soft);}
+  .mood small{display:block;font-size:11px;color:var(--muted);font-family:'Inter';margin-top:2px;}
+  .history{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin-top:12px;}
+  .history div{aspect-ratio:1;border-radius:6px;background:var(--line);}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .stat{background:var(--bg);border-radius:14px;padding:12px;text-align:center;}
+  .stat b{display:block;font-family:'Fraunces',serif;font-size:26px;}
+  .stat span{font-size:12px;color:var(--muted);}
+
+  /* Respiration */
+  .breath{display:grid;place-items:center;padding:16px 0 6px;}
+  .circle{width:150px;height:150px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;
+    transform:scale(.6);transition:transform 4s ease-in-out;}
+  .circle span{font-weight:600;color:var(--accent);transform:scale(1.4);}
+
+  /* Navigation */
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+    display:flex;justify-content:center;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:10;}
+  nav.tabs .inner{display:flex;width:100%;max-width:640px;}
+  nav.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:11.5px;color:var(--muted);border-radius:12px;position:relative;}
+  nav.tabs button svg{width:24px;height:24px;}
+  nav.tabs button.on{color:var(--accent);font-weight:600;}
+  .badge{position:absolute;top:2px;left:calc(50% + 8px);background:var(--warm);color:#fff;font-size:10.5px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px;}
+
+  /* Feuille modale */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20;display:flex;align-items:flex-end;justify-content:center;}
+  .sheet{background:var(--card);width:100%;max-width:640px;border-radius:22px 22px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));animation:up .2s ease;}
+  .sheet h3{font-size:19px;margin-bottom:12px;}
+  .sheet label{display:block;font-size:13px;color:var(--muted);margin:10px 0 6px;}
+  @keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+
+  .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);
+    padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center;}
+  .toast.show{opacity:1;}
+  .toast button{color:var(--warm);font-weight:700;margin-left:10px;pointer-events:auto;}
+  details summary{cursor:pointer;color:var(--muted);font-size:14px;margin:6px 4px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1 id="title">Vider sa tête</h1>
+    <div class="date" id="today-date"></div>
+  </div>
+</header>
+
+<main>
+  <!-- Jauge -->
+  <div class="gauge" id="gauge">
+    <div class="gauge-row"><span class="gauge-label">Charge mentale du moment</span><span class="gauge-value" id="gauge-value"></span></div>
+    <div class="bar"><i id="gauge-bar"></i></div>
+    <div class="gauge-tip" id="gauge-tip"></div>
+  </div>
+
+  <!-- ===== VIDER ===== -->
+  <section id="view-dump">
+    <div class="card">
+      <h2>Qu'est-ce qui t'occupe l'esprit ?</h2>
+      <p class="sub">Écris tout, sans trier. Une idée par ligne. Ta tête n'est pas un agenda.</p>
+      <textarea class="dump" id="dump" placeholder="Prendre RDV dentiste&#10;Racheter du lait&#10;Répondre à la maîtresse…"></textarea>
+      <div class="prompt" id="prompt"></div>
+      <div class="row mt">
+        <button class="btn ghost" id="next-prompt" type="button">Autre idée de rappel</button>
+        <button class="btn primary" id="add-dump" type="button" style="flex:1">Déposer</button>
+      </div>
+    </div>
+
+    <div class="section-title"><h3>À trier</h3><span id="inbox-count"></span></div>
+    <ul class="list" id="inbox"></ul>
+  </section>
+
+  <!-- ===== AUJOURD'HUI ===== -->
+  <section id="view-today" class="hidden">
+    <div class="section-title" style="margin-top:4px"><h3>Mes 3 essentiels</h3><span>le reste peut attendre</span></div>
+    <ul class="list" id="top3"></ul>
+
+    <div class="section-title"><h3>Routines à faire</h3><span id="routines-due-count"></span></div>
+    <ul class="list" id="routines-due"></ul>
+
+    <div class="section-title"><h3>Aussi aujourd'hui</h3><span id="today-count"></span></div>
+    <ul class="list" id="today-list"></ul>
+
+    <div class="section-title"><h3>Plus tard</h3><span id="later-count"></span></div>
+    <ul class="list" id="later-list"></ul>
+
+    <details>
+      <summary id="done-summary">Fait aujourd'hui</summary>
+      <ul class="list" id="done-list"></ul>
+    </details>
+  </section>
+
+  <!-- ===== ROUTINES ===== -->
+  <section id="view-routines" class="hidden">
+    <div class="card">
+      <h2>Routines</h2>
+      <p class="sub">Ce qui revient sans cesse (poubelles, factures, lessive…). Note-le une fois, l'app s'en souvient pour toi.</p>
+      <input class="field" id="routine-text" placeholder="Ex. Sortir les poubelles" maxlength="120">
+      <div class="row mt">
+        <select class="field" id="routine-freq" style="flex:1">
+          <option value="1">Chaque jour</option>
+          <option value="7" selected>Chaque semaine</option>
+          <option value="14">Toutes les 2 semaines</option>
+          <option value="30">Chaque mois</option>
+          <option value="90">Chaque trimestre</option>
+          <option value="365">Chaque année</option>
+        </select>
+        <button class="btn primary" id="add-routine" type="button">Ajouter</button>
+      </div>
+    </div>
+    <ul class="list" id="routines"></ul>
+  </section>
+
+  <!-- ===== PARTAGÉ ===== -->
+  <section id="view-shared" class="hidden">
+    <div class="card">
+      <h2>Partagé, délégué</h2>
+      <p class="sub">La charge mentale, c'est aussi « penser à » à la place des autres. Ici, ce que tu as confié — tu n'as plus à le porter, juste à relancer si besoin.</p>
+    </div>
+    <div id="people"></div>
+  </section>
+
+  <!-- ===== MOI ===== -->
+  <section id="view-me" class="hidden">
+    <div class="card">
+      <h2>Météo intérieure</h2>
+      <p class="sub">Comment tu te sens aujourd'hui ?</p>
+      <div class="moods" id="moods"></div>
+      <div class="history" id="history" title="14 derniers jours"></div>
+    </div>
+
+    <div class="card">
+      <h2>Une minute pour souffler</h2>
+      <p class="sub">Respiration carrée : inspire 4 s, retiens 4 s, expire 4 s, retiens 4 s.</p>
+      <div class="breath"><div class="circle" id="circle"><span id="breath-label">Prêt·e ?</span></div></div>
+      <button class="btn ghost full mt" id="breath-btn" type="button">Commencer (1 min)</button>
+    </div>
+
+    <div class="card">
+      <h2>Cette semaine</h2>
+      <p class="sub">Ce que tu as sorti de ta tête.</p>
+      <div class="stats">
+        <div class="stat"><b id="st-done">0</b><span>faites</span></div>
+        <div class="stat"><b id="st-deleg">0</b><span>confiées</span></div>
+        <div class="stat"><b id="st-drop">0</b><span>lâchées</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Mes données</h2>
+      <p class="sub">Tout reste sur ce téléphone. Sauvegarde de temps en temps.</p>
+      <div class="row wrap">
+        <button class="btn ghost" id="export" type="button">Exporter</button>
+        <label class="btn ghost" style="cursor:pointer">Importer<input type="file" id="import" accept="application/json" class="hidden"></label>
+        <button class="btn ghost" id="wipe" type="button" style="color:var(--warm)">Tout effacer</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs"><div class="inner" id="tabs">
+  <button data-view="dump" class="on" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-4 0-7 2.7-7 6.2 0 2 1 3.6 2.6 4.8V18h8.8v-4c1.6-1.2 2.6-2.8 2.6-4.8C19 5.7 16 3 12 3z"/><path d="M9.5 21h5"/></svg>
+    Vider<span class="badge hidden" id="badge-dump"></span></button>
+  <button data-view="today" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    Aujourd'hui<span class="badge hidden" id="badge-today"></span></button>
+  <button data-view="routines" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg>
+    Routines</button>
+  <button data-view="shared" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.5-3.3 3-5.5 6-5.5s5.5 2.2 6 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.4.3 4 2.2 4.5 4.9"/></svg>
+    Partagé</button>
+  <button data-view="me" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+    Moi</button>
+</div></nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  // ---------- Stockage ----------
+  const KEY = 'esprit-leger-v1';
+  const blank = () => ({ items: [], routines: [], moods: {} });
+  let S;
+  try { S = Object.assign(blank(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch { S = blank(); }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} render(); };
+
+  // ---------- Utilitaires ----------
+  const $ = id => document.getElementById(id);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const DAY = 86400000;
+  const dayKey = (d = new Date()) => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
+  const startOfDay = (d = new Date()) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmtDate = ts => new Date(ts).toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short' });
+  const plural = (n, s, p) => n + ' ' + (n > 1 ? (p || s + 's') : s);
+  const find = id => S.items.find(i => i.id === id);
+
+  // ---------- Messages ----------
+  let toastTimer;
+  function toast(msg, undo) {
+    const t = $('toast');
+    t.innerHTML = esc(msg) + (undo ? '<button type="button">Annuler</button>' : '');
+    if (undo) t.querySelector('button').onclick = () => { undo(); t.classList.remove('show'); };
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), undo ? 4500 : 2200);
+  }
+
+  // Liste de déclencheurs : des questions pour faire remonter ce qui traîne dans la tête
+  const PROMPTS = [
+    'Un rendez-vous médical à prendre ou à confirmer ?',
+    'Un papier administratif qui attend (impôts, CAF, assurance…) ?',
+    'Quelque chose à racheter avant d’en manquer ?',
+    'Un anniversaire ou un cadeau à prévoir ?',
+    'Un message auquel tu n’as pas répondu ?',
+    'Un mot de l’école, une sortie, une inscription ?',
+    'Une facture ou un abonnement à vérifier ?',
+    'Une réparation dans la maison qui traîne ?',
+    'Un repas de la semaine pas encore pensé ?',
+    'Quelqu’un à rappeler ou à qui donner des nouvelles ?',
+    'Un objet à rendre, à rapporter, à renvoyer ?',
+    'Le véhicule : contrôle, entretien, assurance ?',
+    'Une démarche pour un parent, un proche ?',
+    'Un truc au travail qui te trotte dans la tête ?',
+    'Une envie pour toi, rien que pour toi ?'
+  ];
+  let promptIdx = Math.floor(Math.random() * PROMPTS.length);
+  const showPrompt = () => { $('prompt').textContent = PROMPTS[promptIdx % PROMPTS.length]; };
+
+  // ---------- Logique métier ----------
+  function addLines(text) {
+    const lines = text.split('\n').map(l => l.replace(/^[-•*\s]+/, '').trim()).filter(Boolean);
+    lines.forEach(t => S.items.push({ id: uid(), text: t.slice(0, 200), status: 'inbox', created: Date.now() }));
+    return lines.length;
+  }
+
+  function setStatus(id, status, extra = {}) {
+    const it = find(id); if (!it) return;
+    const before = { ...it };
+    Object.assign(it, { status, top: status === 'today' ? it.top : false }, extra);
+    if (status === 'done' || status === 'dropped' || status === 'delegated') it.closedAt = Date.now();
+    save();
+    const msgs = { today: 'Pour aujourd’hui', later: 'Rangé pour plus tard', delegated: 'Confié à ' + (it.who || ''), dropped: 'Lâché. Une chose de moins.', done: 'Bravo, c’est fait', inbox: 'Remis à trier' };
+    toast(msgs[status] || 'OK', () => { Object.keys(it).forEach(k => delete it[k]); Object.assign(it, before); save(); });
+  }
+
+  // Les « plus tard » dont la date est arrivée remontent dans « aujourd'hui »
+  function promoteDue() {
+    const today = startOfDay();
+    let changed = false;
+    S.items.forEach(i => { if (i.status === 'later' && i.date && startOfDay(i.date) <= today) { i.status = 'today'; changed = true; } });
+    return changed;
+  }
+
+  const routineDue = r => !r.last || (startOfDay() - startOfDay(r.last)) >= (r.every - 0.5) * DAY;
+  const routineNext = r => r.last ? startOfDay(r.last) + r.every * DAY : Date.now();
+
+  function load() {
+    const open = S.items.filter(i => i.status === 'inbox' || i.status === 'today');
+    const later = S.items.filter(i => i.status === 'later').length;
+    const due = S.routines.filter(routineDue).length;
+    const score = open.length * 1 + due * 0.8 + later * 0.25;
+    return Math.min(100, Math.round(score / 15 * 100));
+  }
+
+  // ---------- Rendu ----------
+  const VIEWS = { dump: 'Vider sa tête', today: 'Aujourd’hui', routines: 'Routines', shared: 'Partagé', me: 'Prendre soin de moi' };
+  let view = 'dump';
+  try { const v = localStorage.getItem(KEY + '-view'); if (VIEWS[v]) view = v; } catch {}
+
+  function showView(v) {
+    view = v;
+    try { localStorage.setItem(KEY + '-view', v); } catch {}
+    Object.keys(VIEWS).forEach(k => $('view-' + k).classList.toggle('hidden', k !== v));
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+    $('title').textContent = VIEWS[v];
+    window.scrollTo(0, 0);
+  }
+
+  function itemHTML(it, mode) {
+    const meta = [];
+    if (it.date && it.status === 'later') meta.push('Le ' + fmtDate(it.date));
+    if (it.who) meta.push((it.status === 'delegated' ? 'Confié le ' + fmtDate(it.closedAt || it.created) : 'Avec ' + esc(it.who)));
+    let left = '', right = '', actions = '';
+    if (mode === 'inbox') {
+      right = '<button class="x" data-a="del" aria-label="Supprimer">×</button>';
+      actions = `<div class="actions">
+        <button class="act today" data-a="today">Aujourd'hui</button>
+        <button class="act" data-a="later">Plus tard</button>
+        <button class="act" data-a="delegate">Confier</button>
+        <button class="act" data-a="routine">Routine</button>
+        <button class="act drop" data-a="drop">Lâcher prise</button></div>`;
+    } else if (mode === 'today' || mode === 'top') {
+      left = '<button class="check" data-a="done" aria-label="Fait"></button>';
+      right = `<button class="star ${it.top ? 'on' : ''}" data-a="star" aria-label="Essentiel">${it.top ? '★' : '☆'}</button>`;
+      actions = '';
+    } else if (mode === 'later') {
+      right = '<button class="act today" data-a="today">Aujourd’hui</button>';
+    } else if (mode === 'done') {
+      left = '<button class="check done" data-a="undone" aria-label="Pas fait"></button>';
+    } else if (mode === 'delegated') {
+      right = '<button class="act" data-a="nudge">Relancer</button><button class="act" data-a="done">✓</button>';
+    }
+    return `<li class="item ${it.status === 'done' ? 'is-done' : ''}" data-id="${it.id}">
+      <div class="item-main">${left}<div class="item-text">${esc(it.text)}${meta.length ? `<div class="item-meta">${meta.join(' · ')}</div>` : ''}</div>
+      <div class="row">${right}</div></div>${actions}</li>`;
+  }
+
+  const listOr = (arr, mode, emptyMsg) => arr.length ? arr.map(i => itemHTML(i, mode)).join('') : `<li class="empty">${emptyMsg}</li>`;
+
+  function render() {
+    const now = new Date();
+    $('today-date').textContent = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    // Jauge
+    const l = load();
+    const lvl = l < 34 ? ['Légère', 'var(--ok)', 'Tout est sous contrôle. Profite.'] :
+                l < 67 ? ['Moyenne', 'var(--warm)', 'Choisis 3 essentiels, le reste peut attendre.'] :
+                         ['Lourde', '#C9533A', 'Beaucoup en tête. Trie, confie, lâche — tu n’as pas à tout porter.'];
+    $('gauge-value').textContent = lvl[0];
+    $('gauge-value').style.color = lvl[1];
+    $('gauge-bar').style.width = Math.max(4, l) + '%';
+    $('gauge-bar').style.background = lvl[1];
+    $('gauge-tip').textContent = lvl[2];
+
+    // Vider
+    const inbox = S.items.filter(i => i.status === 'inbox');
+    $('inbox').innerHTML = listOr(inbox, 'inbox', 'Rien à trier. Ta tête est plus légère 🌿');
+    $('inbox-count').textContent = inbox.length ? plural(inbox.length, 'élément') : '';
+
+    // Aujourd'hui
+    const today = S.items.filter(i => i.status === 'today');
+    const top = today.filter(i => i.top);
+    $('top3').innerHTML = listOr(top, 'top', 'Touche ☆ sur une tâche pour en faire un essentiel (3 max).');
+    const rest = today.filter(i => !i.top);
+    $('today-list').innerHTML = listOr(rest, 'today', 'Rien d’autre. C’est très bien comme ça.');
+    $('today-count').textContent = rest.length ? String(rest.length) : '';
+
+    const dueR = S.routines.filter(routineDue);
+    $('routines-due').innerHTML = dueR.length ? dueR.map(r => `<li class="item" data-rid="${r.id}"><div class="item-main">
+      <button class="check" data-ra="done" aria-label="Fait"></button><div class="item-text">${esc(r.text)}<div class="item-meta">${freqLabel(r.every)}</div></div></div></li>`).join('')
+      : '<li class="empty">Aucune routine à faire aujourd’hui.</li>';
+    $('routines-due-count').textContent = dueR.length ? String(dueR.length) : '';
+
+    const later = S.items.filter(i => i.status === 'later').sort((a, b) => (a.date || 9e15) - (b.date || 9e15));
+    $('later-list').innerHTML = listOr(later, 'later', 'Rien en attente.');
+    $('later-count').textContent = later.length ? String(later.length) : '';
+
+    const doneToday = S.items.filter(i => i.status === 'done' && i.closedAt >= startOfDay());
+    $('done-list').innerHTML = listOr(doneToday, 'done', 'Pas encore — et ce n’est pas grave.');
+    $('done-summary').textContent = 'Fait aujourd’hui (' + doneToday.length + ')';
+
+    // Routines
+    const rs = [...S.routines].sort((a, b) => routineNext(a) - routineNext(b));
+    $('routines').innerHTML = rs.length ? rs.map(r => {
+      const due = routineDue(r);
+      return `<li class="item" data-rid="${r.id}"><div class="item-main">
+        <button class="check ${due ? '' : 'done'}" data-ra="${due ? 'done' : 'undo'}" aria-label="Fait"></button>
+        <div class="item-text">${esc(r.text)}<div class="item-meta">${freqLabel(r.every)} · ${due ? '<span class="tag">À faire</span>' : 'Prochaine : ' + fmtDate(routineNext(r))}</div></div>
+        <button class="x" data-ra="del" aria-label="Supprimer">×</button></div></li>`;
+    }).join('') : '<li class="empty">Pas encore de routine.</li>';
+
+    // Partagé
+    const deleg = S.items.filter(i => i.status === 'delegated');
+    const byWho = {};
+    deleg.forEach(i => (byWho[i.who] = byWho[i.who] || []).push(i));
+    const names = Object.keys(byWho).sort((a, b) => a.localeCompare(b, 'fr'));
+    $('people').innerHTML = names.length ? names.map(n => `<div class="person"><div class="person-head"><strong>${esc(n)}</strong>
+      <span class="item-meta">${plural(byWho[n].length, 'chose')}</span></div><ul class="list">${byWho[n].map(i => itemHTML(i, 'delegated')).join('')}</ul></div>`).join('')
+      : '<div class="empty">Rien de confié pour l’instant. Dans « Vider », touche « Confier » sur une tâche.</div>';
+
+    // Moi
+    const MOODS = [['😣', 'Épuisé·e'], ['😕', 'Tendu·e'], ['😐', 'Bof'], ['🙂', 'Bien'], ['😌', 'Serein·e']];
+    const tk = dayKey();
+    $('moods').innerHTML = MOODS.map((m, i) => `<button class="mood ${S.moods[tk] === i + 1 ? 'on' : ''}" data-mood="${i + 1}" type="button">${m[0]}<small>${m[1]}</small></button>`).join('');
+    const colors = ['#C9533A', '#E8A87C', '#C9C2B0', '#8CC4A8', '#3C8D5A'];
+    let h = '';
+    for (let d = 13; d >= 0; d--) {
+      const k = dayKey(Date.now() - d * DAY), v = S.moods[k];
+      h += `<div title="${k}" style="${v ? 'background:' + colors[v - 1] : ''}"></div>`;
+    }
+    $('history').innerHTML = h;
+    const weekAgo = Date.now() - 7 * DAY;
+    const closed = s => S.items.filter(i => i.status === s && i.closedAt >= weekAgo).length;
+    $('st-done').textContent = closed('done');
+    $('st-deleg').textContent = closed('delegated');
+    $('st-drop').textContent = closed('dropped');
+
+    // Badges
+    const bd = $('badge-dump'), bt = $('badge-today');
+    bd.textContent = inbox.length; bd.classList.toggle('hidden', !inbox.length);
+    const tc = today.length + dueR.length;
+    bt.textContent = tc; bt.classList.toggle('hidden', !tc);
+  }
+
+  function freqLabel(n) {
+    return ({ 1: 'Chaque jour', 7: 'Chaque semaine', 14: 'Toutes les 2 semaines', 30: 'Chaque mois', 90: 'Chaque trimestre', 365: 'Chaque année' })[n] || ('Tous les ' + n + ' jours');
+  }
+
+  // ---------- Feuilles (date, personne) ----------
+  function sheet(html, onOk) {
+    const bg = document.createElement('div');
+    bg.className = 'sheet-bg';
+    bg.innerHTML = `<div class="sheet" role="dialog">${html}<div class="row mt"><button class="btn ghost" data-s="cancel" type="button" style="flex:1">Annuler</button><button class="btn primary" data-s="ok" type="button" style="flex:1">Valider</button></div></div>`;
+    document.body.appendChild(bg);
+    const close = () => bg.remove();
+    bg.addEventListener('click', e => {
+      if (e.target === bg || e.target.dataset.s === 'cancel') close();
+      if (e.target.dataset.s === 'ok') { if (onOk(bg) !== false) close(); }
+      const quick = e.target.closest('[data-q]');
+      if (quick) { const inp = bg.querySelector('input'); inp.value = quick.dataset.q; }
+    });
+    const f = bg.querySelector('input'); if (f && f.type === 'text') setTimeout(() => f.focus(), 50);
+    bg.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); bg.querySelector('[data-s=ok]').click(); } });
+  }
+
+  function askLater(id) {
+    const it = find(id);
+    const d = n => dayKey(Date.now() + n * DAY);
+    sheet(`<h3>Plus tard — quand ?</h3><p class="sub" style="margin:0">« ${esc(it.text)} »</p>
+      <div class="chips"><button class="chip" data-q="${d(1)}" type="button">Demain</button><button class="chip" data-q="${d(3)}" type="button">Dans 3 jours</button>
+      <button class="chip" data-q="${d(7)}" type="button">Dans 1 semaine</button><button class="chip" data-q="${d(30)}" type="button">Dans 1 mois</button></div>
+      <label for="sh-date">Date (facultative) — la tâche reviendra toute seule ce jour-là</label><input class="field" type="date" id="sh-date">`,
+      bg => { const v = bg.querySelector('#sh-date').value; setStatus(id, 'later', { date: v ? new Date(v + 'T00:00').getTime() : null }); });
+  }
+
+  function askDelegate(id) {
+    const it = find(id);
+    const known = [...new Set(S.items.map(i => i.who).filter(Boolean))].slice(0, 8);
+    sheet(`<h3>Confier à qui ?</h3><p class="sub" style="margin:0">« ${esc(it.text)} »</p>
+      ${known.length ? `<div class="chips">${known.map(n => `<button class="chip" data-q="${esc(n)}" type="button">${esc(n)}</button>`).join('')}</div>` : ''}
+      <label for="sh-who">Prénom</label><input class="field" type="text" id="sh-who" maxlength="40" placeholder="Ex. Julie, mon frère…">`,
+      bg => { const w = bg.querySelector('#sh-who').value.trim(); if (!w) return false; setStatus(id, 'delegated', { who: w }); share(find(id), true); });
+  }
+
+  async function share(it, first) {
+    const text = first ? `Peux-tu t'occuper de ça ? 🙏\n→ ${it.text}\nMerci !` : `Petit rappel 🙂\n→ ${it.text}\nC'est bon de ton côté ?`;
+    if (navigator.share) { try { await navigator.share({ text }); } catch {} }
+    else if (navigator.clipboard) { try { await navigator.clipboard.writeText(text); toast('Message copié — colle-le dans ta messagerie'); } catch {} }
+  }
+
+  // ---------- Événements ----------
+  $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showView(b.dataset.view); });
+
+  $('add-dump').onclick = () => {
+    const n = addLines($('dump').value);
+    if (!n) { $('dump').focus(); return; }
+    $('dump').value = '';
+    save();
+    toast(n > 1 ? `${n} choses déposées. Respire.` : 'Déposé. Tu peux l’oublier.');
+  };
+  $('next-prompt').onclick = () => { promptIdx++; showPrompt(); };
+
+  document.querySelector('main').addEventListener('click', e => {
+    const btn = e.target.closest('[data-a]');
+    if (btn) {
+      const id = btn.closest('[data-id]').dataset.id, it = find(id);
+      if (!it) return;
+      switch (btn.dataset.a) {
+        case 'today': setStatus(id, 'today', { date: null }); break;
+        case 'later': askLater(id); break;
+        case 'delegate': askDelegate(id); break;
+        case 'drop': setStatus(id, 'dropped'); break;
+        case 'done': setStatus(id, 'done'); break;
+        case 'undone': setStatus(id, 'today'); break;
+        case 'nudge': share(it, false); break;
+        case 'routine':
+          S.routines.push({ id: uid(), text: it.text, every: 7, last: null });
+          S.items = S.items.filter(i => i.id !== id);
+          save(); toast('Ajouté aux routines (chaque semaine — modifiable)'); break;
+        case 'del': {
+          const idx = S.items.indexOf(it); S.items.splice(idx, 1); save();
+          toast('Supprimé', () => { S.items.splice(idx, 0, it); save(); }); break;
+        }
+        case 'star':
+          if (!it.top && S.items.filter(i => i.status === 'today' && i.top).length >= 3) { toast('3 essentiels max. Le reste peut attendre.'); break; }
+          it.top = !it.top; save(); break;
+      }
+      return;
+    }
+    const rb = e.target.closest('[data-ra]');
+    if (rb) {
+      const r = S.routines.find(x => x.id === rb.closest('[data-rid]').dataset.rid);
+      if (!r) return;
+      if (rb.dataset.ra === 'done') { r.prev = r.last; r.last = Date.now(); save(); toast('Fait. À la prochaine fois.'); }
+      else if (rb.dataset.ra === 'undo') { r.last = r.prev || null; save(); }
+      else if (rb.dataset.ra === 'del') {
+        const idx = S.routines.indexOf(r); S.routines.splice(idx, 1); save();
+        toast('Routine supprimée', () => { S.routines.splice(idx, 0, r); save(); });
+      }
+      return;
+    }
+    const m = e.target.closest('[data-mood]');
+    if (m) {
+      const k = dayKey(), v = +m.dataset.mood;
+      S.moods[k] = S.moods[k] === v ? undefined : v; save();
+      if (v <= 2 && S.moods[k]) toast('Prends soin de toi. Une minute de respiration ?');
+    }
+  });
+
+  $('add-routine').onclick = () => {
+    const t = $('routine-text').value.trim();
+    if (!t) { $('routine-text').focus(); return; }
+    S.routines.push({ id: uid(), text: t.slice(0, 120), every: +$('routine-freq').value, last: null });
+    $('routine-text').value = ''; save(); toast('Routine ajoutée. Plus besoin d’y penser.');
+  };
+  $('routine-text').addEventListener('keydown', e => { if (e.key === 'Enter') $('add-routine').click(); });
+
+  // Respiration carrée
+  let breathTimer = null;
+  $('breath-btn').onclick = () => {
+    const c = $('circle'), lab = $('breath-label'), btn = $('breath-btn');
+    if (breathTimer) { clearInterval(breathTimer); breathTimer = null; c.style.transform = 'scale(.6)'; lab.textContent = 'Prêt·e ?'; btn.textContent = 'Commencer (1 min)'; return; }
+    const steps = [['Inspire', 'scale(1)'], ['Retiens', 'scale(1)'], ['Expire', 'scale(.6)'], ['Retiens', 'scale(.6)']];
+    let i = 0;
+    const tick = () => {
+      if (i >= 16) { clearInterval(breathTimer); breathTimer = null; lab.textContent = 'Bravo 🌿'; btn.textContent = 'Recommencer'; return; }
+      const [t, s] = steps[i % 4]; lab.textContent = t; c.style.transform = s; i++;
+    };
+    btn.textContent = 'Arrêter'; tick(); breathTimer = setInterval(tick, 4000);
+  };
+
+  // Données
+  $('export').onclick = () => {
+    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'esprit-leger-' + dayKey() + '.json'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('import').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(t => {
+      const d = JSON.parse(t);
+      if (!Array.isArray(d.items) || !Array.isArray(d.routines)) throw new Error();
+      S = Object.assign(blank(), d); save(); toast('Données importées');
+    }).catch(() => toast('Fichier invalide')).finally(() => { e.target.value = ''; });
+  };
+  $('wipe').onclick = () => { if (confirm('Effacer toutes les données de l’app ?')) { S = blank(); save(); toast('Tout est effacé'); } };
+
+  // Rafraîchir quand on revient sur l'app (changement de jour, dates arrivées)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (promoteDue()) save(); else render(); } });
+
+  // ---------- Démarrage ----------
+  if (promoteDue()) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+  showPrompt(); render(); showView(view);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
