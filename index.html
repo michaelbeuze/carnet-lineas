@@ -1356,10 +1356,6 @@
   #trainPop .lb-save{ flex-shrink:0; padding:12px 16px; border-radius:999px; border:1.5px solid #22c55e; background:rgba(34,197,94,.12); color:#4ade80; font:inherit; font-weight:800; font-size:14px; cursor:pointer; transition:background .2s, color .2s, transform .1s; }
   #trainPop .lb-save.dirty{ background:linear-gradient(135deg,#22c55e,#15803D); color:#fff; border-color:#22c55e; box-shadow:0 4px 14px rgba(34,197,94,.45); }
   #trainPop .lb-save:active{ transform:scale(.96); }
-  #trainPop .arr-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:5px; border-radius:999px; background:rgba(255,255,255,.07); margin:2px 0 8px; }
-  #trainPop .arr-tab{ border:0; border-radius:999px; padding:11px; font:inherit; font-weight:800; font-size:15px; background:transparent; color:var(--muted,#9aa4b2); cursor:pointer; }
-  #trainPop .arr-tab.on{ background:linear-gradient(135deg,#f97316,#c2410c); color:#fff; box-shadow:0 4px 12px rgba(249,115,22,.35); }
-  #trainPop .arr-tab.ab-inf.on{ background:linear-gradient(135deg,#22c55e,#15803D); box-shadow:0 4px 12px rgba(34,197,94,.35); }
   #trainPop .lc-card{ border-color:#f97316; background:color-mix(in srgb, #f97316 10%, #121418); }
   #trainPop .lc-big{ background:linear-gradient(135deg,#f97316,#c2410c) !important; }
   #trainPop .lc-swl{ border:1.5px dashed rgba(255,255,255,.3); }
@@ -1404,6 +1400,10 @@
   .as-save{ background:linear-gradient(135deg,#22c55e,#15803D); color:#fff; box-shadow:0 6px 16px rgba(34,197,94,.35); }
   .as-save:disabled{ opacity:.35; box-shadow:none; }
   .as-del{ flex:0 0 auto !important; padding:15px 18px !important; background:rgba(239,68,68,.15); color:#fca5a5; border:1.5px solid #ef4444 !important; }
+  #trainPop .arr-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:2px 0 10px; }
+  #trainPop .arr-tab{ padding:13px 8px; border-radius:16px; font:inherit; font-weight:800; font-size:16px; cursor:pointer; background:rgba(255,255,255,.06); color:var(--muted,#9aa4b2); border:1.5px solid rgba(255,255,255,.12); }
+  #trainPop .arr-tab.t-lc.on{ background:linear-gradient(135deg,#f97316,#c2410c); color:#fff; border-color:#f97316; box-shadow:0 4px 14px rgba(249,115,22,.4); }
+  #trainPop .arr-tab.t-inf.on{ background:linear-gradient(135deg,#22c55e,#15803D); color:#fff; border-color:#22c55e; box-shadow:0 4px 14px rgba(34,197,94,.4); }
   /* ---- Champs de saisie du train en bulles ---- */
   #trainPop .field-mini{ background:linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.12); border-radius:18px; padding:10px 14px 8px; }
   #trainPop .field-mini label{ display:block; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--lime,#D6B23A); margin-bottom:2px; }
@@ -5615,13 +5615,15 @@ function fnndLookup(gare, when){
   hits.sort((a, b) => (/in \+ uit/.test(b.lc) ? 1 : 0) - (/in \+ uit/.test(a.lc) ? 1 : 0));
   return { per, tab, code, hits };
 }
-function phoneViewHTML(f, arr){
-  const gare = (arr ? arr.destination : f.origine) || '';
-  const where = arr ? 'Arrivée' : 'Départ';
+function phoneViewHTML(f){
   const done = ckDone(f);
-  const head = arr ? '' : '<div class="ck-prop">' + (done ? '✅ Checklist complète' : '⚠ Checklist : ' + ckCount(f) + ' / ' + ckTotal(f)) + '</div>';
+  const head = '<div class="ck-prop">' + (done ? '✅ Checklist complète' : '⚠ Checklist : ' + ckCount(f) + ' / ' + ckTotal(f)) + '</div>';
+  return head + infraViewHTML(f.origine || '', 'Départ');
+}
+function infraViewHTML(gare, quand){
+  const head = '';
   if(!isFnnd(gare)){
-    return head + '<div class="ph-card"><div class="ph-where">' + where + ' : <b>' + escapeHtml(fixGareName(gare) || '?') + '</b></div><div class="settings-sub">Pas encore de liste de numéros Infrabel pour cette gare. Pour l\'instant, seul Antwerpen-Noord (FNND) est connu.</div></div>';
+    return head + '<div class="ph-card"><div class="ph-where">' + quand + ' : <b>' + escapeHtml(fixGareName(gare) || '?') + '</b></div><div class="settings-sub">Pas encore de liste de numéros Infrabel pour cette gare. Pour l\'instant, seul Antwerpen-Noord (FNND) est connu.</div></div>';
   }
   const r = fnndLookup(gare);
   const btn = (h, big) => '<a class="ph-call' + (big ? ' big' : '') + '" href="' + fnndTelHref(h.n) + '">📞 ' + fnndTelFmt(h.n) + '<small>' + escapeHtml(h.lc) + '</small></a>';
@@ -5630,7 +5632,7 @@ function phoneViewHTML(f, arr){
   else main = '<div class="settings-sub">Faisceau non précisé dans la fiche' + (r.code ? ' (' + escapeHtml(r.code) + ' inconnu)' : '') + ' : choisis ci-dessous.</div>';
   const all = r.tab.rows.map(([n, locs]) => '<a class="ph-row" href="' + fnndTelHref(n) + '"><b>' + fnndTelFmt(n) + '</b><span>' + locs.map(escapeHtml).join(' · ') + '</span></a>').join('');
   return head +
-    '<div class="ph-card"><div class="ph-where">' + where + ' : <b>Antwerpen-Noord' + (r.code ? ' · faisceau ' + escapeHtml(r.code) : '') + '</b></div>' +
+    '<div class="ph-card"><div class="ph-where">' + quand + ' : <b>Antwerpen-Noord' + (r.code ? ' · faisceau ' + escapeHtml(r.code) : '') + '</b></div>' +
     '<div class="ph-per">Infrabel bloc 9 · ' + escapeHtml(r.tab.lab) + '</div>' + main + '</div>' +
     (r.tab.supervisor ? '' : '<details class="ph-all"' + (r.hits.length ? '' : ' open') + '><summary>Tous les numéros (période actuelle)</summary>' + all + '</details>');
 }
@@ -5879,8 +5881,8 @@ function renderTrainPop(){
   } else if(step === 'lc'){
     title = '🏁 Arrivée · Train ' + escapeHtml(f.trNr || '—');
     const tab = tpState.arrTab || 'lc';
-    body = '<div class="arr-tabs"><button type="button" class="arr-tab' + (tab === 'lc' ? ' on' : '') + '" data-arr="lc">🏁 LC</button><button type="button" class="arr-tab ab-inf' + (tab === 'inf' ? ' on' : '') + '" data-arr="inf">🚦 Infrabel</button></div>'
-      + (tab === 'inf' ? phoneViewHTML(f, l) : lcViewHTML(f, l))
+    body = `<div class="arr-tabs"><button type="button" class="arr-tab t-lc${tab === 'lc' ? ' on' : ''}" data-arr="lc">👷 LC</button><button type="button" class="arr-tab t-inf${tab === 'inf' ? ' on' : ''}" data-arr="inf">🚦 Infrabel</button></div>`
+      + (tab === 'lc' ? lcViewHTML(f, l) : infraViewHTML(l.destination || '', 'Arrivée'))
       + '<div class="tp-row"><button class="tp-ok" data-tp="phclose">✔ Fermer</button></div>';
   } else if(step === 'phone'){
     title = '📞 Prêt au départ · Train ' + escapeHtml(f.trNr || '—');
